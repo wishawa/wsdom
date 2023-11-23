@@ -1,0 +1,100 @@
+use crate::{
+    js::value::JsValue,
+    js_cast::JsCast,
+    retrieve::RetrieveFuture,
+    serialize::{ToJs, UseInJsCode},
+};
+
+use super::nullable::Nullable;
+
+// number, boolean, and string
+
+macro_rules! impl_primitive {
+    ($name:ident) => {
+        #[derive(Clone, ref_cast::RefCast)]
+        #[repr(transparent)]
+        pub struct $name(JsValue);
+
+        impl AsRef<JsValue> for $name {
+            fn as_ref(&self) -> &JsValue {
+                &self.0
+            }
+        }
+
+        impl Into<JsValue> for $name {
+            fn into(self) -> JsValue {
+                self.0
+            }
+        }
+
+        impl JsCast for $name {
+            fn unchecked_from_js(val: JsValue) -> Self {
+                Self(val)
+            }
+            fn unchecked_from_js_ref(val: &JsValue) -> &Self {
+                ref_cast::RefCast::ref_cast(val)
+            }
+        }
+
+        impl UseInJsCode for $name {
+            fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.serialize_to(buf)
+            }
+        }
+    };
+}
+
+impl_primitive!(JsBoolean);
+impl_primitive!(JsString);
+impl_primitive!(JsNumber);
+impl_primitive!(JsSymbol);
+
+impl JsBoolean {
+    pub fn retrieve(&self) -> RetrieveFuture<'_, bool> {
+        self.0.retrieve()
+    }
+}
+impl ToJs<JsBoolean> for bool {}
+impl JsString {
+    pub fn retrieve(&self) -> RetrieveFuture<'_, String> {
+        self.0.retrieve()
+    }
+}
+impl ToJs<JsString> for str {}
+impl JsNumber {
+    pub fn retrieve_float(&self) -> RetrieveFuture<'_, f64> {
+        self.0.retrieve()
+    }
+    pub fn retrieve_int(&self) -> RetrieveFuture<'_, i64> {
+        self.0.retrieve()
+    }
+}
+impl ToJs<JsNumber> for i8 {}
+impl ToJs<JsNumber> for i16 {}
+impl ToJs<JsNumber> for i32 {}
+impl ToJs<JsNumber> for i64 {}
+impl ToJs<JsNumber> for isize {}
+impl ToJs<JsNumber> for u8 {}
+impl ToJs<JsNumber> for u16 {}
+impl ToJs<JsNumber> for u32 {}
+impl ToJs<JsNumber> for u64 {}
+impl ToJs<JsNumber> for usize {}
+impl ToJs<JsNumber> for f32 {}
+impl ToJs<JsNumber> for f64 {}
+
+// null and undefined
+pub struct JsNull;
+pub struct JsUndefined;
+
+impl UseInJsCode for JsNull {
+    fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        buf.write_str("null")
+    }
+}
+impl UseInJsCode for JsUndefined {
+    fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        buf.write_str("undefined")
+    }
+}
+
+impl<T: Into<JsValue> + JsCast> ToJs<Nullable<T>> for JsNull {}
