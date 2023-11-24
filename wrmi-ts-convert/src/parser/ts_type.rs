@@ -1,12 +1,16 @@
 use winnow::{
-    combinator::{alt, delimited, opt, preceded, separated0, separated_pair},
+    ascii::dec_int,
+    combinator::{alt, delimited, opt, preceded, repeat, separated0, separated_pair},
     PResult, Parser,
 };
 
 use super::{
+    comment::WithComment,
+    expr::Expr,
     generic::GenericArgs,
+    member::Member,
     method::MethodArg,
-    util::{token, word1, Parsable},
+    util::{quote_backslash_escape, token, token_word, word1, Parsable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,40 +31,87 @@ pub(crate) enum TsType<'a> {
     StringLit {
         str: &'a str,
     },
+    IntLit {
+        int: i32,
+    },
     Array {
         item: Box<TsType<'a>>,
     },
     FixedArray {
         types: Vec<TsType<'a>>,
     },
+    ObjectIndex {
+        obj_index: Box<(TsType<'a>, TsType<'a>)>,
+    },
+    Parenthesis {
+        ty: Box<TsType<'a>>,
+    },
+    Interface {
+        members: Vec<WithComment<'a, Member<'a>>>,
+    },
+    KeyOf {
+        ty: Box<TsType<'a>>,
+    },
+    TypeOf {
+        expr: Expr<'a>,
+    },
+    PatternString {
+        pattern: &'a str,
+    },
 }
 
 impl<'a> TsType<'a> {
     fn parse_single(input: &mut &'a str) -> PResult<Self> {
-        (
-            alt((
-                NamedType::parse.map(|ty| Self::Named { ty }),
-                Self::parse_arow_func,
-                delimited(token('('), Self::parse_arow_func, token(')')),
-                delimited('"', word1, '"') //pub TODO:actually allow any string literal
-                    .recognize()
-                    .map(|str| Self::StringLit { str }),
-                delimited(
-                    token('['),
-                    separated0(TsType::parse, token(',')),
-                    token(']'),
-                )
-                .map(|types| Self::FixedArray { types }),
-            )),
-            opt((token('['), token(']'))),
-        )
-            .parse_next(input)
-            .map(|(main_res, brackets)| match brackets {
-                Some(_) => Self::Array {
-                    item: Box::new(main_res),
+        let mut res = alt((
+            // keyof
+            preceded(token_word("keyof"), TsType::parse).map(|ty| Self::KeyOf { ty: Box::new(ty) }),
+            // typeof
+            preceded(token_word("typeof"), Expr::parse).map(|expr| Self::TypeOf { expr }),
+            // named
+            NamedType::parse.map(|ty| Self::Named { ty }),
+            // arrow function
+            Self::parse_arow_func,
+            // parenthesis
+            delimited(token('('), Self::parse, token(')'))
+                .map(|ty| Self::Parenthesis { ty: Box::new(ty) }),
+            // string literal
+            quote_backslash_escape('"').map(|str| Self::StringLit { str }),
+            // pattern string
+            quote_backslash_escape('`').map(|content| Self::PatternString { pattern: content }),
+            // int literal
+            dec_int.map(|int| Self::IntLit { int }),
+            // fixed array
+            delimited(
+                token('['),
+                separated0(TsType::parse, token(',')),
+                token(']'),
+            )
+            .map(|types| Self::FixedArray { types }),
+            // interface
+            delimited(
+                token('{'),
+                repeat(0.., WithComment::<Member>::parse),
+                token('}'),
+            )
+            .map(|members| Self::Interface { members }),
+        ))
+        .parse_next(input)?;
+
+        // array and index
+        while let Ok(bracket) =
+            delimited(token('['), opt(TsType::parse), token(']')).parse_next(input)
+        {
+            res = match bracket {
+                Some(item) => TsType::ObjectIndex {
+                    obj_index: Box::new((res, item)),
                 },
-                None => main_res,
-            })
+                None => TsType::Array {
+                    item: Box::new(res),
+                },
+            };
+        }
+
+        Ok(res)
     }
     fn parse_arow_func(input: &mut &'a str) -> PResult<Self> {
         (

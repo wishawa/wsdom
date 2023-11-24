@@ -7,7 +7,7 @@ use super::{
     generic::GenericsDeclaration,
     method::MethodArg,
     ts_type::TsType,
-    util::{token, word1, Parsable},
+    util::{token, token_word, word1, Parsable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,7 +21,7 @@ pub(crate) struct DeclareFunction<'a> {
 impl<'a> Parsable<'a> for DeclareFunction<'a> {
     fn parse(input: &mut &'a str) -> winnow::PResult<Self> {
         delimited(
-            (token("declare"), token("function")),
+            (opt(token_word("declare")), token_word("function")),
             (
                 word1,
                 opt(GenericsDeclaration::parse),

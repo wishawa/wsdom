@@ -8,7 +8,7 @@ use super::{
     generic::GenericsDeclaration,
     member::Member,
     ts_type::TsType,
-    util::{token, word1, Parsable},
+    util::{token, token_word, word1, Parsable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,12 +22,12 @@ pub(crate) struct Interface<'a> {
 impl<'a> Parsable<'a> for Interface<'a> {
     fn parse(input: &mut &'a str) -> PResult<Self> {
         preceded(
-            token("interface"),
+            token_word("interface"),
             (
                 word1,
                 opt(GenericsDeclaration::parse),
                 opt(preceded(
-                    token("extends"),
+                    token_word("extends"),
                     separated1(TsType::parse, token(',')),
                 )),
                 delimited(

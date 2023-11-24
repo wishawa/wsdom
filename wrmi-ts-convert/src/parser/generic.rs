@@ -5,7 +5,7 @@ use winnow::{
 
 use super::{
     ts_type::TsType,
-    util::{token, word1, Parsable},
+    util::{token, token_word, word1, Parsable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -35,7 +35,7 @@ impl<'a> Parsable<'a> for GenericsDeclarationArg<'a> {
     fn parse(input: &mut &'a str) -> PResult<Self> {
         (
             word1,
-            opt(preceded(token("extends"), TsType::parse)),
+            opt(preceded(token_word("extends"), TsType::parse)),
             opt(preceded(token('='), TsType::parse)),
         )
             .parse_next(input)

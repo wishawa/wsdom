@@ -1,36 +1,30 @@
 use winnow::{
-    combinator::{delimited, repeat, separated_pair},
+    combinator::{alt, delimited, opt, separated_pair},
     PResult, Parser,
 };
 
 use super::{
-    comment::WithComment,
-    member::Member,
-    util::{token, word1, Parsable},
+    ts_type::TsType,
+    util::{token, token_word, word1, Parsable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DeclareVar<'a> {
     pub name: &'a str,
-    pub members: Vec<WithComment<'a, Member<'a>>>,
+    pub ty: TsType<'a>,
 }
 
 impl<'a> Parsable<'a> for DeclareVar<'a> {
     fn parse(input: &mut &'a str) -> PResult<Self> {
         delimited(
-            (token("declare"), token("var")),
-            separated_pair(
-                word1,
-                token(':'),
-                delimited(
-                    token('{'),
-                    repeat(0.., WithComment::<Member>::parse),
-                    token('}'),
-                ),
+            (
+                opt(token_word("declare")),
+                token_word(alt(("var", "const"))),
             ),
+            separated_pair(word1, token(':'), TsType::parse),
             token(';'),
         )
-        .map(|(name, members)| Self { name, members })
+        .map(|(name, ty)| Self { name, ty })
         .parse_next(input)
     }
 }

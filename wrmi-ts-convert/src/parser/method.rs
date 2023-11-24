@@ -46,16 +46,22 @@ pub(crate) struct MethodArg<'a> {
     pub name: &'a str,
     pub optional: bool,
     pub ty: TsType<'a>,
+    pub variadic: bool,
 }
 impl<'a> Parsable<'a> for MethodArg<'a> {
     fn parse(input: &mut &'a str) -> PResult<Self> {
-        separated_pair((word1, opt(token('?'))), token(':'), TsType::parse)
-            .map(|((name, optional), ty)| Self {
-                name,
-                optional: optional.is_some(),
-                ty,
-            })
-            .parse_next(input)
+        separated_pair(
+            (opt(token("...")), word1, opt(token('?'))),
+            token(':'),
+            TsType::parse,
+        )
+        .map(|((variadic, name, optional), ty)| Self {
+            name,
+            optional: optional.is_some(),
+            ty,
+            variadic: variadic.is_some(),
+        })
+        .parse_next(input)
     }
 }
 

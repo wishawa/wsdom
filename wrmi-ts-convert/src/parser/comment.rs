@@ -1,6 +1,6 @@
 use winnow::{
     ascii::{line_ending, multispace0, not_line_ending},
-    combinator::{alt, delimited, opt},
+    combinator::{alt, delimited, repeat},
     token::take_until0,
     PResult, Parser,
 };
@@ -25,14 +25,14 @@ impl<'a> Parsable<'a> for Comment<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct WithComment<'a, T> {
-    pub comment: Option<Comment<'a>>,
+    pub comment: Vec<Comment<'a>>,
     pub data: T,
 }
 
 impl<'a, T: Parsable<'a>> Parsable<'a> for WithComment<'a, T> {
     fn parse(input: &mut &'a str) -> PResult<Self> {
         (
-            opt(delimited(multispace0, Comment::parse, multispace0)),
+            repeat(0.., delimited(multispace0, Comment::parse, multispace0)),
             T::parse,
         )
             .map(|(comment, data)| Self { comment, data })

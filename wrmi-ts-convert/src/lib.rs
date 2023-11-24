@@ -8,7 +8,7 @@ mod tests {
 
     #[test]
     fn parse_file() {
-        let filepath = "../data/dom.iterable.generated.d.ts";
+        let filepath = "../data/dom.generated.d.ts";
         let root = std::env::var("CARGO_MANIFEST_DIR").unwrap_or(".".into());
         let full_path = std::path::Path::new(&root).join(&filepath);
 
@@ -25,8 +25,6 @@ mod tests {
         let mut input = &*dts_content;
         let _imports = parse_imports.parse_next(&mut input).unwrap();
 
-        if crate::parser::parse_all(&mut input).is_err() {
-            println!("{input}");
-        }
+        crate::parser::parse_all(&mut input).unwrap();
     }
 }

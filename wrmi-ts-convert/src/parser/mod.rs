@@ -1,29 +1,32 @@
 use winnow::{
-    ascii::line_ending,
     combinator::{alt, delimited, repeat},
-    token::take_until0,
     PResult, Parser,
 };
 
-use crate::parser::util::token;
+use crate::parser::util::{quote_backslash_escape, token, token_word};
 
 use self::{
     comment::{Comment, WithComment},
     declare_function::DeclareFunction,
     declare_var::DeclareVar,
     interface::Interface,
+    namespace::Namespace,
+    type_alias::TypeAlias,
     util::Parsable,
 };
 
 mod comment;
 mod declare_function;
 mod declare_var;
+mod expr;
 mod field;
 mod generic;
 mod interface;
 mod member;
 mod method;
+mod namespace;
 mod ts_type;
+mod type_alias;
 mod util;
 
 pub(crate) fn parse_all<'a>(input: &mut &'a str) -> PResult<Vec<WithComment<'a, Item<'a>>>> {
@@ -45,11 +48,11 @@ pub(crate) fn parse_imports<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
             (
                 token("///"),
                 token("<"),
-                token("reference"),
-                token("lib"),
+                token_word("reference"),
+                token_word("lib"),
                 token('='),
             ),
-            delimited('"', take_until0("\""), '"'),
+            quote_backslash_escape('"'),
             token("/>"),
         )
         .parse_next(input)
@@ -62,6 +65,8 @@ pub(crate) enum Item<'a> {
     Interface(Interface<'a>),
     DeclareVar(DeclareVar<'a>),
     DeclareFunction(DeclareFunction<'a>),
+    TypeAlias(TypeAlias<'a>),
+    Namespace(Namespace<'a>),
 }
 
 impl<'a> Parsable<'a> for Item<'a> {
@@ -70,6 +75,8 @@ impl<'a> Parsable<'a> for Item<'a> {
             Interface::parse.map(Self::Interface),
             DeclareVar::parse.map(Self::DeclareVar),
             DeclareFunction::parse.map(Self::DeclareFunction),
+            TypeAlias::parse.map(Self::TypeAlias),
+            Namespace::parse.map(Self::Namespace),
         ))
         .parse_next(input)
     }
@@ -78,10 +85,10 @@ impl<'a> Parsable<'a> for Item<'a> {
 mod tests {
 
     #[test]
-    fn basic_test() {
+    fn test1() {
         use super::{
             comment::{Comment, WithComment},
-            field::Field,
+            field::{Field, FieldName},
             member::Member,
             method::{Method, MethodName},
             ts_type::{NamedType, TsType},
@@ -102,53 +109,53 @@ declare var Element: {
         assert_eq!(
             parsed,
             WithComment {
-                comment: Some(Comment {
+                comment: vec!(Comment {
                     source: "// Hello this is a test\n"
                 }),
                 data: Item::DeclareVar(DeclareVar {
                     name: "Element",
-                    members: vec![
-                        WithComment {
-                            comment: None,
-                            data: Member::Field(Field {
-                                readonly: false,
-                                name: "prototype",
-                                optional: false,
-                                ty: TsType::Named {
-                                    ty: NamedType {
-                                        generic: Default::default(),
-                                        name: "Element"
+                    ty: TsType::Interface {
+                        members: vec![
+                            WithComment {
+                                comment: vec![],
+                                data: Member::Field(Field {
+                                    readonly: false,
+                                    name: FieldName::Name("prototype"),
+                                    optional: false,
+                                    ty: TsType::Named {
+                                        ty: NamedType {
+                                            generic: Default::default(),
+                                            name: "Element"
+                                        }
                                     }
-                                }
-                            })
-                        },
-                        WithComment {
-                            comment: None,
-                            data: Member::Method(Method {
-                                name: MethodName::Constructor,
-                                generics: Default::default(),
-                                args: vec![],
-                                ret: TsType::Named {
-                                    ty: NamedType {
-                                        name: "Element",
-                                        generic: Default::default()
+                                })
+                            },
+                            WithComment {
+                                comment: vec![],
+                                data: Member::Method(Method {
+                                    name: MethodName::Constructor,
+                                    generics: Default::default(),
+                                    args: vec![],
+                                    ret: TsType::Named {
+                                        ty: NamedType {
+                                            name: "Element",
+                                            generic: Default::default()
+                                        }
                                     }
-                                }
-                            })
-                        }
-                    ]
+                                })
+                            }
+                        ]
+                    }
                 })
             }
         )
     }
     #[test]
-    fn another_test() {
+    fn test2() {
         use super::{Item, Parsable, WithComment};
         use winnow::{combinator::repeat, Parser};
 
-        let _: Vec<_> = repeat(0.., WithComment::<Item>::parse)
-            .parse(
-                &mut r#"
+        let mut input = r#"
 /**
  * Hahaha
  */
@@ -174,8 +181,27 @@ interface UnderlyingByteSource {
     start?: (controller: ReadableByteStreamController) => any;
     type: "bytes";
 }
-            "#,
-            )
-            .unwrap();
+interface ReadableStream<R = any> {
+    /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/ReadableStream/locked) */
+    readonly locked: boolean;
+    /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/ReadableStream/cancel) */
+    cancel(reason?: any): Promise<void>;
+    /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/ReadableStream/getReader) */
+    getReader(options: { mode: "byob" }): ReadableStreamBYOBReader;
+    getReader(): ReadableStreamDefaultReader<R>;
+    getReader(options?: ReadableStreamGetReaderOptions): ReadableStreamReader<R>;
+    /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/ReadableStream/pipeThrough) */
+    pipeThrough<T>(transform: ReadableWritablePair<T, R>, options?: StreamPipeOptions): ReadableStream<T>;
+    /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/ReadableStream/pipeTo) */
+    pipeTo(destination: WritableStream<R>, options?: StreamPipeOptions): Promise<void>;
+    /** [MDN Reference](https://developer.mozilla.org/docs/Web/API/ReadableStream/tee) */
+    tee(): [ReadableStream<R>, ReadableStream<R>];
+}
+            "#;
+
+        let parse_res: Result<Vec<_>, _> =
+            repeat(0.., WithComment::<Item>::parse).parse_next(&mut input);
+        println!("{}", input);
+        parse_res.unwrap();
     }
 }
