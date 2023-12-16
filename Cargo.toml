@@ -1,0 +1,8 @@
+[workspace]
+members = [
+	"wrmi/",
+	"wrmi-core/",
+	"wrmi-api/",
+	"wrmi-macros/",
+	"wrmi-ts-convert/"
+]

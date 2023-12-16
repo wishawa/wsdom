@@ -6,8 +6,8 @@ use winnow::{
 
 use super::{
     comment::WithComment,
+    item::Item,
     util::{token, token_word, word1, Parsable},
-    Item,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,5 +1,20 @@
-use std::{collections::HashMap, error::Error, fmt::Arguments, fmt::Write, task::Waker};
+use std::{
+    cell::RefCell, collections::HashMap, error::Error, fmt::Arguments, fmt::Write, sync::Arc,
+    task::Waker,
+};
 
+use parking_lot::ReentrantMutex;
+
+/// A WRMI client.
+///
+/// You can use this to call JS functions on the client.
+/// Every JsValue holds a Browser object which they internally use for calling methods, etc.
+///
+/// Browser uses Arc internally, so cloning is cheap and a cloned Browser points to the same client.
+#[derive(Clone, Debug)]
+pub struct Browser(pub(crate) Arc<ReentrantMutex<RefCell<WrmiLink>>>);
+
+#[derive(Debug)]
 pub struct WrmiLink {
     pub(crate) retrieve_wakers: HashMap<u64, Waker>,
     pub(crate) retrieve_values: HashMap<u64, String>,

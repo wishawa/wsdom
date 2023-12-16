@@ -17,13 +17,20 @@ macro_rules! impl_primitive {
 
         impl AsRef<JsValue> for $name {
             fn as_ref(&self) -> &JsValue {
-                &self.0
+                JsCast::unchecked_from_js_ref(&self.0)
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = JsValue;
+            fn deref(&self) -> &JsValue {
+                self.as_ref()
             }
         }
 
         impl Into<JsValue> for $name {
             fn into(self) -> JsValue {
-                self.0
+                JsCast::unchecked_from_js(self.0)
             }
         }
 
@@ -51,22 +58,22 @@ impl_primitive!(JsSymbol);
 
 impl JsBoolean {
     pub fn retrieve(&self) -> RetrieveFuture<'_, bool> {
-        self.0.retrieve()
+        self.0.retrieve_and_deserialize()
     }
 }
 impl ToJs<JsBoolean> for bool {}
 impl JsString {
     pub fn retrieve(&self) -> RetrieveFuture<'_, String> {
-        self.0.retrieve()
+        self.0.retrieve_and_deserialize()
     }
 }
 impl ToJs<JsString> for str {}
 impl JsNumber {
     pub fn retrieve_float(&self) -> RetrieveFuture<'_, f64> {
-        self.0.retrieve()
+        self.0.retrieve_and_deserialize()
     }
     pub fn retrieve_int(&self) -> RetrieveFuture<'_, i64> {
-        self.0.retrieve()
+        self.0.retrieve_and_deserialize()
     }
 }
 impl ToJs<JsNumber> for i8 {}

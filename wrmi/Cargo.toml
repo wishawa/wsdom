@@ -1,12 +1,11 @@
 [package]
-name = "wrmi-ts-convert"
+name = "wrmi"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-winnow = "0.5.17"
-proc-macro2 = "1"
-quote = "1"
-syn = { version = "2", features = ["full"] }
+wrmi-macros = { path = "../wrmi-macros/" }
+wrmi-core = { path = "../wrmi-core/" }
+ref-cast = "1"

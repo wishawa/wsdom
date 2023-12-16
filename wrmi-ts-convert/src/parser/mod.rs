@@ -1,43 +1,38 @@
 use winnow::{
-    combinator::{alt, delimited, repeat},
+    combinator::{delimited, repeat},
     PResult, Parser,
 };
 
 use crate::parser::util::{quote_backslash_escape, token, token_word};
 
-use self::{
-    comment::{Comment, WithComment},
-    declare_function::DeclareFunction,
-    declare_var::DeclareVar,
-    interface::Interface,
-    namespace::Namespace,
-    type_alias::TypeAlias,
-    util::Parsable,
-};
+use self::util::Parsable;
 
-mod comment;
-mod declare_function;
-mod declare_var;
-mod expr;
-mod field;
-mod generic;
-mod interface;
-mod member;
-mod method;
-mod namespace;
-mod ts_type;
-mod type_alias;
-mod util;
+pub(crate) mod comment;
+pub(crate) mod declare_function;
+pub(crate) mod declare_var;
+pub(crate) mod expr;
+pub(crate) mod field;
+pub(crate) mod generic;
+pub(crate) mod interface;
+pub(crate) mod item;
+pub(crate) mod member;
+pub(crate) mod method;
+pub(crate) mod namespace;
+pub(crate) mod ts_type;
+pub(crate) mod type_alias;
+pub(crate) mod util;
 
-pub(crate) fn parse_all<'a>(input: &mut &'a str) -> PResult<Vec<WithComment<'a, Item<'a>>>> {
+pub(crate) fn parse_all<'a>(
+    input: &mut &'a str,
+) -> PResult<Vec<comment::WithComment<'a, item::Item<'a>>>> {
     loop {
-        if Comment::parse.parse_next(input).is_err() {
+        if comment::Comment::parse.parse_next(input).is_err() {
             break;
         }
     }
     let mut out = Vec::new();
     while !input.is_empty() {
-        out.push(WithComment::<Item>::parse.parse_next(input)?);
+        out.push(comment::WithComment::<item::Item>::parse.parse_next(input)?);
     }
     Ok(out)
 }
@@ -60,39 +55,19 @@ pub(crate) fn parse_imports<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
     repeat(0.., parse_import).parse_next(input)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Item<'a> {
-    Interface(Interface<'a>),
-    DeclareVar(DeclareVar<'a>),
-    DeclareFunction(DeclareFunction<'a>),
-    TypeAlias(TypeAlias<'a>),
-    Namespace(Namespace<'a>),
-}
-
-impl<'a> Parsable<'a> for Item<'a> {
-    fn parse(input: &mut &'a str) -> PResult<Self> {
-        alt((
-            Interface::parse.map(Self::Interface),
-            DeclareVar::parse.map(Self::DeclareVar),
-            DeclareFunction::parse.map(Self::DeclareFunction),
-            TypeAlias::parse.map(Self::TypeAlias),
-            Namespace::parse.map(Self::Namespace),
-        ))
-        .parse_next(input)
-    }
-}
-
 mod tests {
 
     #[test]
     fn test1() {
         use super::{
             comment::{Comment, WithComment},
+            declare_var::DeclareVar,
             field::{Field, FieldName},
+            item::Item,
             member::Member,
             method::{Method, MethodName},
             ts_type::{NamedType, TsType},
-            DeclareVar, Item, Parsable,
+            util::Parsable,
         };
         use winnow::Parser;
         let parsed: WithComment<Item> = Parsable::parse
@@ -152,7 +127,7 @@ declare var Element: {
     }
     #[test]
     fn test2() {
-        use super::{Item, Parsable, WithComment};
+        use super::{comment::WithComment, item::Item, Parsable};
         use winnow::{combinator::repeat, Parser};
 
         let mut input = r#"

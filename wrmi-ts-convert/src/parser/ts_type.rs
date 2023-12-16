@@ -43,9 +43,6 @@ pub(crate) enum TsType<'a> {
     ObjectIndex {
         obj_index: Box<(TsType<'a>, TsType<'a>)>,
     },
-    Parenthesis {
-        ty: Box<TsType<'a>>,
-    },
     Interface {
         members: Vec<WithComment<'a, Member<'a>>>,
     },
@@ -72,8 +69,7 @@ impl<'a> TsType<'a> {
             // arrow function
             Self::parse_arow_func,
             // parenthesis
-            delimited(token('('), Self::parse, token(')'))
-                .map(|ty| Self::Parenthesis { ty: Box::new(ty) }),
+            delimited(token('('), Self::parse, token(')')),
             // string literal
             quote_backslash_escape('"').map(|str| Self::StringLit { str }),
             // pattern string

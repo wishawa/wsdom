@@ -14,7 +14,7 @@ use super::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Interface<'a> {
     pub name: &'a str,
-    pub generic: GenericsDeclaration<'a>,
+    pub generics: GenericsDeclaration<'a>,
     pub extends: Vec<TsType<'a>>,
     pub members: Vec<WithComment<'a, Member<'a>>>,
 }
@@ -39,7 +39,7 @@ impl<'a> Parsable<'a> for Interface<'a> {
         )
         .map(|(name, generic, extends, members)| Self {
             name,
-            generic: generic.unwrap_or_default(),
+            generics: generic.unwrap_or_default(),
             extends: extends.unwrap_or_default(),
             members,
         })

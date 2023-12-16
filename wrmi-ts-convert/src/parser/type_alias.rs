@@ -11,9 +11,9 @@ use super::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TypeAlias<'a> {
-    name: &'a str,
-    generics: GenericsDeclaration<'a>,
-    ty: TsType<'a>,
+    pub name: &'a str,
+    pub generics: GenericsDeclaration<'a>,
+    pub ty: TsType<'a>,
 }
 
 impl<'a> Parsable<'a> for TypeAlias<'a> {
