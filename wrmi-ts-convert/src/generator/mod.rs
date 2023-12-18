@@ -1,3 +1,4 @@
+mod alias;
 mod class;
 mod utils;
 
@@ -142,13 +143,6 @@ impl<'a> Context<'a> {
             _ => quote! { __wrmi_load_ts_macro::JsObject },
         }
     }
-    // fn find_decl(&self, name: &str) -> Option<&'a [WithComment<'a, Member<'a>>]> {
-    //     self.declare_classes
-    //         .iter()
-    //         .rev()
-    //         .flat_map(|hm| hm.get(name).cloned())
-    //         .next()
-    // }
 }
 pub(crate) fn make_types<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream {
     let mut generated_code = Vec::<TokenStream>::new();
@@ -217,6 +211,9 @@ pub(crate) fn make_types<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream {
                     });
 
                 generated_code.push(ctx.make_class(&*iface, decl_members));
+            }
+            Item::TypeAlias(ta) => {
+                generated_code.push(ctx.make_type_alias(ta));
             }
             _ => {}
         }

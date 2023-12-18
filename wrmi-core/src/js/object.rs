@@ -1,4 +1,4 @@
-use crate::{js::value::JsValue, js_cast::JsCast};
+use crate::{js::value::JsValue, js_cast::JsCast, ToJs, UseInJsCode};
 
 /// Represents a JsValue that is an object.
 /// I don't actually know what constitute an object in JavaScript,
@@ -36,3 +36,11 @@ impl JsCast for JsObject {
         ref_cast::RefCast::ref_cast(val)
     }
 }
+
+impl UseInJsCode for JsObject {
+    fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        UseInJsCode::serialize_to(&self.0, buf)
+    }
+}
+
+impl ToJs<JsObject> for JsObject {}

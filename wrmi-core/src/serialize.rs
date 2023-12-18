@@ -54,6 +54,13 @@ impl<'a, T: UseInJsCode + ?Sized> std::fmt::Display for UseInJsCodeWriter<'a, T>
     }
 }
 
+pub struct RawCodeImmediate<'a>(pub &'a str);
+impl<'a> UseInJsCode for RawCodeImmediate<'a> {
+    fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        buf.write_str(self.0)
+    }
+}
+
 /// Values that can be serialized to JS code satisfying certain types.
 ///
 /// For example, `ToJs<JsNumber>` means serializable to the same type that

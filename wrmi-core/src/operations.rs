@@ -13,26 +13,36 @@ impl Browser {
         &'a self,
         function_name: &'a str,
         args: impl IntoIterator<Item = &'a dyn UseInJsCode>,
+        last_arg_variadic: bool,
     ) -> JsValue {
-        self.call_function_inner(&format_args!("{}", function_name), args)
+        self.call_function_inner(&format_args!("{}", function_name), args, last_arg_variadic)
     }
 
     fn call_function_inner<'a>(
         &'a self,
         function: &std::fmt::Arguments<'_>,
         args: impl IntoIterator<Item = &'a dyn UseInJsCode>,
+        last_arg_variadic: bool,
     ) -> JsValue {
         let id = {
             let link = self.0.lock();
             let mut link = link.borrow_mut();
             let out_id = link.get_new_id();
             write!(link.raw_commands_buf(), "{SET}({out_id},{function}(").unwrap();
-            for arg in args.into_iter() {
+            // for arg in args.into_iter() {
+            let mut iter = args.into_iter().peekable();
+            while let Some(arg) = iter.next() {
                 let arg = UseInJsCodeWriter(arg);
-                if write!(link.raw_commands_buf(), "{arg},").is_err() {
+                let res = if last_arg_variadic && iter.peek().is_none() {
+                    write!(link.raw_commands_buf(), "...{arg},")
+                } else {
+                    write!(link.raw_commands_buf(), "{arg},")
+                };
+                if res.is_err() {
                     link.kill(Box::new(CommandSerializeFailed));
                 }
             }
+            // }
             write!(link.raw_commands_buf(), "));\n").unwrap();
             out_id
         };
@@ -42,11 +52,60 @@ impl Browser {
         }
     }
 
-    pub(crate) fn new_value<'a>(&'a self, code: std::fmt::Arguments<'a>) -> JsValue {
+    pub fn get_field(&self, base_obj: &dyn UseInJsCode, property: &dyn UseInJsCode) -> JsValue {
+        let browser = self.clone();
+        let id = {
+            let link = browser.0.lock();
+            let mut link = link.borrow_mut();
+            let out_id = link.get_new_id();
+            let base_obj = UseInJsCodeWriter(base_obj);
+            let property = UseInJsCodeWriter(property);
+            if write!(
+                link.raw_commands_buf(),
+                "{SET}({out_id},({base_obj})[{property}]);\n"
+            )
+            .is_err()
+            {
+                link.kill(Box::new(CommandSerializeFailed));
+            }
+            out_id
+        };
+        JsValue { id, browser }
+    }
+    pub fn set_field(
+        &self,
+        base_obj: &dyn UseInJsCode,
+        property: &dyn UseInJsCode,
+        value: &dyn UseInJsCode,
+    ) {
+        let link = self.0.lock();
+        let mut link = link.borrow_mut();
+        let (base_obj, property, value) = (
+            UseInJsCodeWriter(base_obj),
+            UseInJsCodeWriter(property),
+            UseInJsCodeWriter(value),
+        );
+        if write!(
+            link.raw_commands_buf(),
+            "({base_obj})[{property}]={value};\n"
+        )
+        .is_err()
+        {
+            link.kill(Box::new(CommandSerializeFailed));
+        }
+    }
+
+    pub fn run_raw_code<'a>(&'a self, code: std::fmt::Arguments<'a>) {
+        let link = self.0.lock();
+        let mut link = link.borrow_mut();
+        link.send_command(code);
+    }
+
+    pub fn value_from_raw_code<'a>(&'a self, code: std::fmt::Arguments<'a>) -> JsValue {
         let link = self.0.lock();
         let mut link = link.borrow_mut();
         let out_id = link.get_new_id();
-        write!(link.raw_commands_buf(), "{SET}({out_id},{code})").unwrap();
+        write!(link.raw_commands_buf(), "{SET}({out_id},{code});").unwrap();
         JsValue {
             id: out_id,
             browser: self.to_owned(),
@@ -103,18 +162,26 @@ impl JsObject {
         &'a self,
         method_name: &'a str,
         args: impl IntoIterator<Item = &'a dyn UseInJsCode>,
+        last_arg_variadic: bool,
     ) -> JsValue {
         let self_id = self.id;
-        self.browser
-            .call_function_inner(&format_args!("{GET}({self_id}).{method_name}"), args)
+        self.browser.call_function_inner(
+            &format_args!("{GET}({self_id}).{method_name}"),
+            args,
+            last_arg_variadic,
+        )
     }
     pub fn js_call_self<'a>(
         &'a self,
         args: impl IntoIterator<Item = &'a dyn UseInJsCode>,
+        last_arg_variadic: bool,
     ) -> JsValue {
         let self_id = self.id;
-        self.browser
-            .call_function_inner(&format_args!("({GET}({self_id}))"), args)
+        self.browser.call_function_inner(
+            &format_args!("({GET}({self_id}))"),
+            args,
+            last_arg_variadic,
+        )
     }
 }
 

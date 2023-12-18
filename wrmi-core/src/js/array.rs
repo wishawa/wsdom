@@ -55,3 +55,10 @@ where
     U: serde::Serialize + ToJs<T>,
 {
 }
+
+impl<T, U> ToJs<JsArray<T>> for JsArray<U>
+where
+    T: ToJs<U>,
+    U: JsCast,
+{
+}

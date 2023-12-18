@@ -26,3 +26,5 @@ declare var History: {
     prototype: History;
     new(): History;
 };
+
+type ScrollRestoration = "auto" | "manual";

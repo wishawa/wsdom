@@ -46,6 +46,7 @@ macro_rules! impl_primitive {
                 self.0.serialize_to(buf)
             }
         }
+        impl ToJs<$name> for $name {}
     };
 }
 
