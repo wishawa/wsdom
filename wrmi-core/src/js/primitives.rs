@@ -5,8 +5,6 @@ use crate::{
     serialize::{ToJs, UseInJsCode},
 };
 
-use super::nullable::Nullable;
-
 // number, boolean, and string
 
 macro_rules! impl_primitive {
@@ -90,18 +88,8 @@ impl ToJs<JsNumber> for f32 {}
 impl ToJs<JsNumber> for f64 {}
 
 // null and undefined
-pub struct JsNull;
-pub struct JsUndefined;
 
-impl UseInJsCode for JsNull {
-    fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        buf.write_str("null")
-    }
-}
-impl UseInJsCode for JsUndefined {
-    fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        buf.write_str("undefined")
-    }
-}
+impl_primitive!(JsNull);
+impl_primitive!(JsUndefined);
 
-impl<T: Into<JsValue> + JsCast> ToJs<Nullable<T>> for JsNull {}
+// impl<T: Into<JsValue> + JsCast> ToJs<Nullable<T>> for JsNull {}

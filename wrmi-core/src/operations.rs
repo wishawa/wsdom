@@ -11,10 +11,10 @@ use crate::{
 impl Browser {
     pub fn call_function<'a>(
         &'a self,
-        function: &'a str,
+        function_name: &'a str,
         args: impl IntoIterator<Item = &'a dyn UseInJsCode>,
     ) -> JsValue {
-        self.call_function_inner(&format_args!("{}", function), args)
+        self.call_function_inner(&format_args!("{}", function_name), args)
     }
 
     fn call_function_inner<'a>(
@@ -75,7 +75,7 @@ impl JsObject {
             let property = UseInJsCodeWriter(property);
             if write!(
                 link.raw_commands_buf(),
-                "{SET}({out_id},{GET}({self_id}).{property});\n"
+                "{SET}({out_id},{GET}({self_id})[{property}]);\n"
             )
             .is_err()
             {

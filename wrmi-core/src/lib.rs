@@ -8,7 +8,7 @@ mod serialize;
 
 pub use link::{Browser, WrmiLink};
 pub mod js_types {
-    pub use super::js::{object::JsObject, primitives::*, value::JsValue};
+    pub use super::js::{array::JsArray, object::JsObject, primitives::*, value::JsValue};
 }
 pub use js_cast::JsCast;
 pub use serialize::{ToJs, UseInJsCode};

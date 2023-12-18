@@ -1,3 +1,6 @@
+mod class;
+mod utils;
+
 use std::{borrow::Cow, collections::HashMap};
 
 use proc_macro2::{Ident, Span, TokenStream};
@@ -10,6 +13,7 @@ use crate::parser::{
     interface::Interface,
     item::Item,
     member::Member,
+    method::{Method, MethodName},
     ts_type::{NamedType, TsType},
 };
 
@@ -36,8 +40,9 @@ mod known_types {
 
 #[derive(Default)]
 struct Context<'a> {
-    types: Vec<HashMap<&'a str, (GenericsDeclaration<'a>, TsType<'a>)>>,
-    declares: Vec<HashMap<&'a str, &'a [WithComment<'a, Member<'a>>]>>,
+    types: HashMap<&'a str, Interface<'a>>,
+    aliases: HashMap<&'a str, (GenericsDeclaration<'a>, TsType<'a>)>,
+    declare_globals: HashMap<&'a str, &'a TsType<'a>>,
 }
 
 impl<'a> Context<'a> {
@@ -113,6 +118,7 @@ impl<'a> Context<'a> {
                     "number" => ("JsNumber", true),
                     "string" => ("JsString", true),
                     "boolean" => ("JsBoolean", true),
+                    "void" => ("JsUndefined", true),
                     name => (name, false),
                 };
                 let ident = Ident::new(name, Span::call_site());
@@ -130,232 +136,87 @@ impl<'a> Context<'a> {
             }
             TsType::Array { item } => {
                 let inner = self.ts_type_to_rust(*item);
-                quote! { JsArray<#inner> }
+                quote! { __wrmi_load_ts_macro::JsArray<#inner> }
             }
-            TsType::KeyOf { .. } => quote! { JsString },
-            _ => quote! { JsObject },
+            TsType::KeyOf { .. } => quote! { __wrmi_load_ts_macro::JsString },
+            _ => quote! { __wrmi_load_ts_macro::JsObject },
         }
     }
-
-    fn find_decl(&self, name: &str) -> Option<&'a [WithComment<'a, Member<'a>>]> {
-        self.declares
-            .iter()
-            .rev()
-            .flat_map(|hm| hm.get(name).cloned())
-            .next()
-    }
+    // fn find_decl(&self, name: &str) -> Option<&'a [WithComment<'a, Member<'a>>]> {
+    //     self.declare_classes
+    //         .iter()
+    //         .rev()
+    //         .flat_map(|hm| hm.get(name).cloned())
+    //         .next()
+    // }
 }
 pub(crate) fn make_types<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream {
-    fn make_rust_type(
-        ctx: &Context<'_>,
-        interface: &Interface<'_>,
-        decl_var: &[WithComment<'_, Member<'_>>],
-    ) -> TokenStream {
-        let name = Ident::new(interface.name, Span::call_site());
-
-        let (generics_with_bound, generics_without_bound) = if interface.generics.args.is_empty() {
-            (None, None)
-        } else {
-            let with_bounds = interface.generics.args.iter().map(|arg| {
-                let name = Ident::new(arg.name, Span::call_site());
-                match &arg.extends {
-                    Some(t) => {
-                        let bound = ctx.ts_type_to_rust(t.to_owned());
-                        quote! {
-                            #name: AsRef<#bound>
-                        }
-                    }
-                    None => {
-                        quote! {
-                            #name
-                        }
-                    }
-                }
-            });
-            let without_bounds = interface.generics.args.iter().map(|arg| {
-                let name = Ident::new(arg.name, Span::call_site());
-                quote! {
-                    #name
-                }
-            });
-            (
-                Some(quote! { <#(#with_bounds,)*> }),
-                Some(quote! { <#(#without_bounds,)*> }),
-            )
-        };
-
-        let generics_for_phantom = generics_without_bound
-            .as_ref()
-            .map(Cow::Borrowed)
-            .unwrap_or_else(|| Cow::Owned(quote! {<()>}));
-
-        let tokens = quote! {
-            #[derive(::core::clone::Clone, __wrmi_load_ts_macro::RefCast)]
-            #[repr(transparent)]
-            struct #name #generics_with_bound (__wrmi_load_ts_macro::JsValue, ::core::marker::PhantomData #generics_for_phantom );
-        };
-
-        let extends = interface
-            .extends
-            .iter()
-            .map(ToOwned::to_owned)
-            .chain([known_types::UNKNOWN, known_types::OBJECT].into_iter())
-            .map(|iface| ctx.ts_type_to_rust(iface.to_owned()));
-        let first_extend = ctx.ts_type_to_rust(
-            interface
-                .extends
-                .first()
-                .unwrap_or(&known_types::OBJECT)
-                .to_owned(),
-        );
-
-        let tokens = quote! {
-            #tokens
-
-            impl #generics_with_bound __wrmi_load_ts_macro::JsCast for #name #generics_without_bound {
-                fn unchecked_from_js(val: __wrmi_load_ts_macro::JsValue) -> Self {
-                    Self(val, ::core::marker::PhantomData)
-                }
-                fn unchecked_from_js_ref(val: &__wrmi_load_ts_macro::JsValue) -> &Self {
-                    __wrmi_load_ts_macro::RefCast::ref_cast(val)
-                }
-            }
-            impl #generics_with_bound __wrmi_load_ts_macro::UseInJsCode for #name #generics_without_bound {
-                fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    self.0.serialize_to(buf)
-                }
-            }
-
-            #(
-                impl #generics_with_bound ::core::convert::AsRef<#extends> for #name #generics_without_bound {
-                    fn as_ref(&self) -> &#extends {
-                        __wrmi_load_ts_macro::JsCast::unchecked_from_js_ref(&self.0)
-                    }
-                }
-                impl #generics_with_bound ::core::convert::Into<#extends> for #name #generics_without_bound {
-                    fn into(self) -> #extends {
-                        __wrmi_load_ts_macro::JsCast::unchecked_from_js(self.0)
-                    }
-                }
-            )*
-
-            impl #generics_with_bound std::ops::Deref for #name #generics_with_bound {
-                type Target = #first_extend;
-                fn deref(&self) -> &Self::Target {
-                    self.as_ref()
-                }
-            }
-        };
-
-        let tokens = {
-            fn make_member_code(
-                ctx: &Context<'_>,
-                interface_name: &'_ str,
-                member: &Member<'_>,
-                is_constructor: bool,
-            ) -> Option<TokenStream> {
-                match member {
-                    Member::Method(method) => {
-                        let method_name_str = match method.name {
-                            crate::parser::method::MethodName::Nothing => "call_self",
-                            crate::parser::method::MethodName::Constructor => "new",
-                            crate::parser::method::MethodName::Iterator => return None,
-                            crate::parser::method::MethodName::Name(name) => name,
-                        };
-                        let method_name_ident = Ident::new(method_name_str, Span::call_site());
-                        let arg_names = method
-                            .args
-                            .iter()
-                            .map(|arg| Ident::new(arg.name, Span::call_site()));
-                        let arg_names_cloned = arg_names.clone();
-                        let arg_types = method.args.iter().map(|arg| {
-                            let arg_type = ctx.ts_type_to_rust(arg.ty.to_owned());
-                            quote! {impl __wrmi_load_ts_macro::ToJs<#arg_type>}
-                        });
-                        let ret = ctx.ts_type_to_rust(method.ret.to_owned());
-                        if is_constructor {
-                            let function = &*format!("{}.{}", interface_name, method_name_str);
-                            Some(quote! {
-                                fn #method_name_ident (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names: #arg_types,)*) -> #ret {
-                                    __wrmi_load_ts_macro::JsCast::unchecked_from_js(browser.call_function(#function, [#(#arg_names_cloned,)*]))
-                                }
-                            })
-                        } else {
-                            Some(quote! {
-                                fn #method_name_ident (&self, #(#arg_names: #arg_types,)*) -> #ret {
-                                    __wrmi_load_ts_macro::JsCast::unchecked_from_js(self.0.js_call_method(method_name_str, [#(#arg_names_cloned,)*]))
-                                }
-                            })
-                        }
-                    }
-                    _ => None
-                    // Member::Field(_) => todo!(),
-                    // Member::Getter(_) => todo!(),
-                    // Member::Setter(_) => todo!(),
-                }
-            }
-
-            let member_code =
-                interface
-                    .members
-                    .iter()
-                    .filter_map(|member| make_member_code(ctx, interface.name, &member.data, false))
-                    .chain(decl_var.iter().flat_map(|member| {
-                        make_member_code(ctx, interface.name, &member.data, true)
-                    }));
-
-            quote! {
-                #tokens
-                impl #generics_with_bound #name #generics_without_bound {
-                    #(#member_code)*
-                }
-            }
-        };
-
-        tokens
-    }
-
-    let mut ctx = Context::default();
-    let mut generated_code = Vec::new();
-    let mut root_types_layer = HashMap::new();
-    let mut root_decls_layer = HashMap::new();
+    let mut generated_code = Vec::<TokenStream>::new();
+    let mut types = HashMap::new();
+    let mut aliases = HashMap::new();
+    let mut declare_globals = HashMap::new();
     for item in dts {
         match &item.data {
             Item::Interface(interface) => {
                 let interface = interface.clone();
-                root_types_layer.insert(
-                    interface.name,
-                    (
-                        interface.generics,
-                        TsType::Interface {
-                            members: interface.members,
-                        },
-                    ),
-                );
+                types.insert(interface.name, interface);
             }
             Item::TypeAlias(alias) => {
                 let alias = alias.clone();
-                root_types_layer.insert(alias.name, (alias.generics, alias.ty));
+                aliases.insert(alias.name, (alias.generics, alias.ty));
             }
-            Item::DeclareVar(DeclareVar {
-                name,
-                ty: TsType::Interface { members },
-            }) => {
-                root_decls_layer.insert(*name, &**members);
+            Item::DeclareVar(DeclareVar { name, ty }) => {
+                declare_globals.insert(*name, ty);
             }
             _ => {}
         }
     }
-    ctx.types.push(root_types_layer);
-    ctx.declares.push(root_decls_layer);
+    let ctx = Context {
+        types,
+        aliases,
+        declare_globals,
+    };
     for item in dts {
         match &item.data {
-            Item::Interface(interface) => {
-                generated_code.push(make_rust_type(
-                    &ctx,
-                    interface,
-                    ctx.find_decl(interface.name).unwrap_or(&[]),
-                ));
+            Item::DeclareVar(DeclareVar { name, ty }) => {
+                let Some((decl_members, direct_decl)) = (match ty {
+                    TsType::Named {
+                        ty: NamedType { name, .. },
+                    } => ctx
+                        .types
+                        .get(name)
+                        .map(|interface| (&*interface.members, false)),
+                    TsType::Interface { members } => Some((&**members, true)),
+                    _ => None,
+                }) else {
+                    continue;
+                };
+
+                let iface = decl_members
+                    .iter()
+                    .find_map(|member| match &member.data {
+                        Member::Method(Method {
+                            name: MethodName::Constructor,
+                            ret:
+                                TsType::Named {
+                                    ty: NamedType { name, .. },
+                                },
+                            ..
+                        }) => ctx.types.get(name),
+                        _ => None,
+                    })
+                    .or_else(|| direct_decl.then(|| ctx.types.get(name)).flatten())
+                    .map(Cow::Borrowed)
+                    .unwrap_or_else(|| {
+                        Cow::Owned(Interface {
+                            extends: Default::default(),
+                            generics: Default::default(),
+                            members: Default::default(),
+                            name,
+                        })
+                    });
+
+                generated_code.push(ctx.make_class(&*iface, decl_members));
             }
             _ => {}
         }

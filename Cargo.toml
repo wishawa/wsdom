@@ -2,7 +2,8 @@
 members = [
 	"wrmi/",
 	"wrmi-core/",
-	"wrmi-api/",
 	"wrmi-macros/",
-	"wrmi-ts-convert/"
+	"wrmi-ts-convert/",
+	"wrmi-javascript/",
+	"wrmi-dom/"
 ]
