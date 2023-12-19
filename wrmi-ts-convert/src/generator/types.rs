@@ -2,10 +2,10 @@ use crate::parser::{
     generic::GenericArgs,
     ts_type::{NamedType, TsType},
 };
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 
-use super::Context;
+use super::{utils::new_ident_safe, Context};
 
 pub(super) mod known_types {
     use crate::parser::{
@@ -154,7 +154,7 @@ impl<'a> Context<'a> {
                     "__translate_nullable" => ("JsNullable", true),
                     name => (name, false),
                 };
-                let ident = Ident::new(name, Span::call_site());
+                let ident = new_ident_safe(name);
                 let prefix = common.then(|| quote! {__wrmi_load_ts_macro::});
                 if ty.generic.args.is_empty() {
                     quote! {

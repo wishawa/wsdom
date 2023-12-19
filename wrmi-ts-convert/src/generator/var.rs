@@ -1,13 +1,13 @@
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::parser::ts_type::TsType;
+use crate::{generator::utils::new_ident_safe, parser::ts_type::TsType};
 
 use super::Context;
 
 impl<'a> Context<'a> {
     pub(super) fn make_global_var_getter(&self, name: &str, ty: &TsType<'a>) -> TokenStream {
-        let function_name = Ident::new(name, Span::call_site());
+        let function_name = new_ident_safe(name);
         let ty = self.convert_type(ty.to_owned());
         quote! {
             pub fn #function_name (browser: &__wrmi_load_ts_macro::Browser) -> #ty {

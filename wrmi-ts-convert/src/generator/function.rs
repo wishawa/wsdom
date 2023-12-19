@@ -1,16 +1,16 @@
-use crate::{generator::utils::to_snake_case, parser::declare_function::DeclareFunction};
-use proc_macro2::{Ident, Span, TokenStream};
+use crate::{
+    generator::utils::{new_ident_safe, to_snake_case},
+    parser::declare_function::DeclareFunction,
+};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use super::Context;
 
 impl<'a> Context<'a> {
     pub(super) fn make_function(&self, df: &DeclareFunction<'a>) -> TokenStream {
-        let function_name_ident = Ident::new(&to_snake_case(df.name), Span::call_site());
-        let arg_names_sig = df
-            .args
-            .iter()
-            .map(|arg| Ident::new(arg.name, Span::call_site()));
+        let function_name_ident = new_ident_safe(&to_snake_case(df.name));
+        let arg_names_sig = df.args.iter().map(|arg| new_ident_safe(arg.name));
         let arg_names_body = arg_names_sig.clone();
         let arg_types = df.args.iter().map(|arg| {
             let arg_type = self.convert_type(arg.ty.to_owned());
@@ -19,7 +19,7 @@ impl<'a> Context<'a> {
         let last_arg_variadic = df.args.iter().any(|arg| arg.variadic);
         let ret = self.convert_type(df.ret.to_owned());
         let function_generics = df.generics.args.iter().map(|gen| {
-            let name = Ident::new(gen.name, Span::call_site());
+            let name = new_ident_safe(gen.name);
             let extends = gen
                 .extends
                 .clone()

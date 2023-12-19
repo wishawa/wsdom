@@ -1,11 +1,15 @@
 use std::borrow::Cow;
 
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::parser::{comment::WithComment, interface::Interface, member::Member, ts_type::TsType};
 
-use super::{types::known_types, utils::to_snake_case, Context};
+use super::{
+    types::known_types,
+    utils::{new_ident_safe, to_snake_case},
+    Context,
+};
 
 impl<'a> Context<'a> {
     pub(super) fn make_class(
@@ -13,13 +17,13 @@ impl<'a> Context<'a> {
         interface: &Interface<'_>,
         decl_members: &[WithComment<'_, Member<'_>>],
     ) -> TokenStream {
-        let name = Ident::new(interface.name, Span::call_site());
+        let name = new_ident_safe(interface.name);
 
         let (generics_with_bound, generics_without_bound) = if interface.generics.args.is_empty() {
             (None, None)
         } else {
             let with_bounds = interface.generics.args.iter().map(|arg| {
-                let name = Ident::new(arg.name, Span::call_site());
+                let name = new_ident_safe(arg.name);
                 match &arg.extends {
                     Some(t) => {
                         let bound = self.convert_type(t.to_owned());
@@ -35,7 +39,7 @@ impl<'a> Context<'a> {
                 }
             });
             let without_bounds = interface.generics.args.iter().map(|arg| {
-                let name = Ident::new(arg.name, Span::call_site());
+                let name = new_ident_safe(arg.name);
                 quote! {
                     #name
                 }
@@ -147,12 +151,8 @@ impl<'a> Context<'a> {
                     crate::parser::method::MethodName::Iterator => return None,
                     crate::parser::method::MethodName::Name(name) => name,
                 };
-                let method_name_ident =
-                    Ident::new(&to_snake_case(method_name_str), Span::call_site());
-                let arg_names_sig = method
-                    .args
-                    .iter()
-                    .map(|arg| Ident::new(arg.name, Span::call_site()));
+                let method_name_ident = new_ident_safe(&to_snake_case(method_name_str));
+                let arg_names_sig = method.args.iter().map(|arg| new_ident_safe(arg.name));
                 let arg_names_body = arg_names_sig.clone();
                 let arg_types = method.args.iter().map(|arg| {
                     let arg_type = self.convert_type(arg.ty.to_owned());
@@ -161,7 +161,7 @@ impl<'a> Context<'a> {
                 let last_arg_variadic = method.args.iter().any(|arg| arg.variadic);
                 let ret = self.convert_type(method.ret.to_owned());
                 let method_generics = method.generics.args.iter().map(|gen| {
-                    let name = Ident::new(gen.name, Span::call_site());
+                    let name = new_ident_safe(gen.name);
                     let extends = gen.extends.clone().map(|ty| self.convert_type(ty)).into_iter();
                     quote! {
                         #name #(: ::core::convert::AsRef<#extends> + ::core::convert::Into<#extends>)*
@@ -215,8 +215,7 @@ impl<'a> Context<'a> {
                 let ty = self.convert_type(ty);
                 let field_name_snake_case = to_snake_case(field_name_str);
                 let getter = {
-                    let getter_name_ident =
-                        Ident::new(&format!("get_{field_name_snake_case}"), Span::call_site());
+                    let getter_name_ident = new_ident_safe(&format!("get_{field_name_snake_case}"));
                     if on_instance {
                         quote! {
                             pub fn #getter_name_ident (&self) -> #ty {
@@ -236,7 +235,7 @@ impl<'a> Context<'a> {
                     }
                 };
                 let setter = (!field.readonly).then(|| {
-                    let setter_name_ident = Ident::new(&format!("set_{field_name_snake_case}"), Span::call_site());
+                    let setter_name_ident = new_ident_safe(&format!("set_{field_name_snake_case}"));
                     if on_instance {
                         quote!{
                             pub fn #setter_name_ident (&self, value: &impl __wrmi_load_ts_macro::ToJs<#ty>) {
@@ -262,10 +261,8 @@ impl<'a> Context<'a> {
                     todo!("getter {} on constructor {}", getter.name, interface_name);
                 }
                 let field_name_str = getter.name;
-                let getter_name_ident = Ident::new(
-                    &format!("get_{}", to_snake_case(field_name_str)),
-                    Span::call_site(),
-                );
+                let getter_name_ident =
+                    new_ident_safe(&format!("get_{}", to_snake_case(field_name_str)));
                 let ret = self.convert_type(getter.ret.to_owned());
                 Some(quote! {
                     pub fn #getter_name_ident (&self) -> #ret {
@@ -280,10 +277,8 @@ impl<'a> Context<'a> {
                     todo!("setter {} on constructor {}", setter.name, interface_name);
                 }
                 let field_name_str = setter.name;
-                let setter_name_ident = Ident::new(
-                    &format!("set_{}", to_snake_case(field_name_str)),
-                    Span::call_site(),
-                );
+                let setter_name_ident =
+                    new_ident_safe(&format!("set_{}", to_snake_case(field_name_str)));
                 let ty = self.convert_type(setter.arg_ty.to_owned());
                 Some(quote! {
                     pub fn #setter_name_ident (&self, value: #ty) {
