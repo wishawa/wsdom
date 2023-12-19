@@ -259,7 +259,7 @@ impl<'a> Context<'a> {
             }
             Member::Getter(getter) => {
                 if !on_instance {
-                    todo!("getter on constructor?");
+                    todo!("getter {} on constructor {}", getter.name, interface_name);
                 }
                 let field_name_str = getter.name;
                 let getter_name_ident = Ident::new(
@@ -277,7 +277,7 @@ impl<'a> Context<'a> {
             }
             Member::Setter(setter) => {
                 if !on_instance {
-                    todo!("setter on constructor?");
+                    todo!("setter {} on constructor {}", setter.name, interface_name);
                 }
                 let field_name_str = setter.name;
                 let setter_name_ident = Ident::new(

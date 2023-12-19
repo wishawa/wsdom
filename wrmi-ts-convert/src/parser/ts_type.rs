@@ -1,5 +1,5 @@
 use winnow::{
-    ascii::dec_int,
+    ascii::{dec_int, hex_uint},
     combinator::{alt, delimited, opt, preceded, repeat, separated0, separated_pair},
     PResult, Parser,
 };
@@ -64,8 +64,6 @@ impl<'a> TsType<'a> {
             preceded(token_word("keyof"), TsType::parse).map(|ty| Self::KeyOf { ty: Box::new(ty) }),
             // typeof
             preceded(token_word("typeof"), Expr::parse).map(|expr| Self::TypeOf { expr }),
-            // named
-            NamedType::parse.map(|ty| Self::Named { ty }),
             // arrow function
             Self::parse_arow_func,
             // parenthesis
@@ -75,7 +73,10 @@ impl<'a> TsType<'a> {
             // pattern string
             quote_backslash_escape('`').map(|content| Self::PatternString { pattern: content }),
             // int literal
+            preceded("0x", hex_uint).map(|int: u32| Self::IntLit { int: int as _ }),
             dec_int.map(|int| Self::IntLit { int }),
+            // named
+            NamedType::parse.map(|ty| Self::Named { ty }),
             // fixed array
             delimited(
                 token('['),
