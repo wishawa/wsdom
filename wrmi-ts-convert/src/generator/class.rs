@@ -3,12 +3,12 @@ use std::borrow::Cow;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 
-use crate::parser::{comment::WithComment, interface::Interface, member::Member};
+use crate::parser::{comment::WithComment, interface::Interface, member::Member, ts_type::TsType};
 
-use super::{known_types, utils::to_snake_case, Context};
+use super::{types::known_types, utils::to_snake_case, Context};
 
 impl<'a> Context<'a> {
-    pub fn make_class(
+    pub(super) fn make_class(
         &self,
         interface: &Interface<'_>,
         decl_members: &[WithComment<'_, Member<'_>>],
@@ -22,7 +22,7 @@ impl<'a> Context<'a> {
                 let name = Ident::new(arg.name, Span::call_site());
                 match &arg.extends {
                     Some(t) => {
-                        let bound = self.ts_type_to_rust(t.to_owned());
+                        let bound = self.convert_type(t.to_owned());
                         quote! {
                             #name: AsRef<#bound>
                         }
@@ -62,8 +62,8 @@ impl<'a> Context<'a> {
             .iter()
             .map(ToOwned::to_owned)
             .chain([known_types::UNKNOWN, known_types::OBJECT].into_iter())
-            .map(|iface| self.ts_type_to_rust(iface.to_owned()));
-        let first_extend = self.ts_type_to_rust(
+            .map(|iface| self.convert_type(iface.to_owned()));
+        let first_extend = self.convert_type(
             interface
                 .extends
                 .first()
@@ -155,14 +155,28 @@ impl<'a> Context<'a> {
                     .map(|arg| Ident::new(arg.name, Span::call_site()));
                 let arg_names_body = arg_names_sig.clone();
                 let arg_types = method.args.iter().map(|arg| {
-                    let arg_type = self.ts_type_to_rust(arg.ty.to_owned());
+                    let arg_type = self.convert_type(arg.ty.to_owned());
                     quote! {&impl __wrmi_load_ts_macro::ToJs<#arg_type>}
                 });
                 let last_arg_variadic = method.args.iter().any(|arg| arg.variadic);
-                let ret = self.ts_type_to_rust(method.ret.to_owned());
+                let ret = self.convert_type(method.ret.to_owned());
+                let method_generics = method.generics.args.iter().map(|gen| {
+                    let name = Ident::new(gen.name, Span::call_site());
+                    let extends = gen.extends.clone().map(|ty| self.convert_type(ty)).into_iter();
+                    quote! {
+                        #name #(: ::core::convert::AsRef<#extends> + ::core::convert::Into<#extends>)*
+                    }
+                });
+                let method_generics = if method.generics.args.is_empty() {
+                    None
+                } else {
+                    Some(quote! {
+                        <#(#method_generics,)*>
+                    })
+                };
                 if on_instance {
                     Some(quote! {
-                        pub fn #method_name_ident (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {
+                        pub fn #method_name_ident #method_generics (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {
                             __wrmi_load_ts_macro::JsCast::unchecked_from_js(
                                 __wrmi_load_ts_macro::JsObject::js_call_method(self.as_ref(), #method_name_str, [
                                     #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode, )*
@@ -177,7 +191,7 @@ impl<'a> Context<'a> {
                         format!("{}.{}", interface_name, method_name_str)
                     };
                     Some(quote! {
-                        pub fn #method_name_ident (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
+                        pub fn #method_name_ident #method_generics (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
                             __wrmi_load_ts_macro::JsCast::unchecked_from_js(
                                 browser.call_function(#function, [
                                     #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
@@ -192,7 +206,13 @@ impl<'a> Context<'a> {
                     crate::parser::field::FieldName::Name(name) => *name,
                     crate::parser::field::FieldName::Wildcard { .. } => return None,
                 };
-                let ty = self.ts_type_to_rust(field.ty.to_owned());
+                let mut ty = field.ty.to_owned();
+                if field.optional {
+                    ty = TsType::Union {
+                        pair: Box::new((ty, known_types::NULL)),
+                    };
+                }
+                let ty = self.convert_type(ty);
                 let field_name_snake_case = to_snake_case(field_name_str);
                 let getter = {
                     let getter_name_ident =
@@ -237,11 +257,40 @@ impl<'a> Context<'a> {
                     #setter
                 })
             }
-            _ => None,
+            Member::Getter(getter) => {
+                if !on_instance {
+                    todo!("getter on constructor?");
+                }
+                let field_name_str = getter.name;
+                let getter_name_ident = Ident::new(
+                    &format!("get_{}", to_snake_case(field_name_str)),
+                    Span::call_site(),
+                );
+                let ret = self.convert_type(getter.ret.to_owned());
+                Some(quote! {
+                    pub fn #getter_name_ident (&self) -> #ret {
+                        __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                            __wrmi_load_ts_macro::JsObject::js_get_field(self.as_ref(), &#field_name_str)
+                        )
+                    }
+                })
+            }
+            Member::Setter(setter) => {
+                if !on_instance {
+                    todo!("setter on constructor?");
+                }
+                let field_name_str = setter.name;
+                let setter_name_ident = Ident::new(
+                    &format!("set_{}", to_snake_case(field_name_str)),
+                    Span::call_site(),
+                );
+                let ty = self.convert_type(setter.arg_ty.to_owned());
+                Some(quote! {
+                    pub fn #setter_name_ident (&self, value: #ty) {
+                        __wrmi_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, &value)
+                    }
+                })
+            }
         }
     }
-    // fn make_getter(&self, interface_name: &str, field_name: &str, on_instance: bool) {
-    //     let name_ident = Ident::new(&format!("get_{field_name}"), Span::call_site());
-    //     Some()
-    // }
 }

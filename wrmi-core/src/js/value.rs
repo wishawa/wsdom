@@ -1,7 +1,6 @@
 use crate::js_cast::JsCast;
 use crate::link::Browser;
 use crate::protocol::{DEL, GET, SET};
-use crate::UseInJsCode;
 use std::fmt::Write;
 
 /// Represents a value that exists on the JavaScript side.

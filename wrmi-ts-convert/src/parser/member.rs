@@ -35,8 +35,8 @@ impl<'a> Parsable<'a> for Member<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Getter<'a> {
-    name: &'a str,
-    ret: TsType<'a>,
+    pub name: &'a str,
+    pub ret: TsType<'a>,
 }
 
 impl<'a> Parsable<'a> for Getter<'a> {
@@ -52,9 +52,9 @@ impl<'a> Parsable<'a> for Getter<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Setter<'a> {
-    name: &'a str,
-    arg_name: &'a str,
-    arg_ty: TsType<'a>,
+    pub name: &'a str,
+    pub arg_name: &'a str,
+    pub arg_ty: TsType<'a>,
 }
 
 impl<'a> Parsable<'a> for Setter<'a> {

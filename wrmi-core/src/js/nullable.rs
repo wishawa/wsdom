@@ -1,36 +1,34 @@
-use std::marker::PhantomData;
+use crate::{js::value::JsValue, js_cast::JsCast, serialize::UseInJsCode};
 
-use crate::{js::value::JsValue, js_cast::JsCast, serialize::UseInJsCode, ToJs};
+include!("impl_basic.rs");
 
-#[derive(Clone, ref_cast::RefCast)]
-#[repr(transparent)]
-pub struct Nullable<T>(JsValue, PhantomData<T>);
+impl_basic!(JsNullish);
 
-impl<T: AsRef<JsValue>> AsRef<JsValue> for Nullable<T> {
-    fn as_ref(&self) -> &JsValue {
-        self.0.as_ref()
+impl_basic!(JsNullable; T; JsValue);
+
+impl JsNullish {
+    pub fn into_nullable_ref<T>(&self) -> &JsNullable<T> {
+        JsCast::unchecked_ref(self)
+    }
+    pub fn into_nullable<T>(self) -> JsNullable<T> {
+        JsCast::unchecked_into(self)
     }
 }
 
-impl<T: Into<JsValue>> Into<JsValue> for Nullable<T> {
-    fn into(self) -> JsValue {
-        self.0.into()
+impl<T> JsNullable<T>
+where
+    T: JsCast,
+{
+    pub fn from_nonnull(value: T) -> Self {
+        JsCast::unchecked_into(value)
+    }
+    pub fn from_nonnull_ref(value: &T) -> &Self {
+        JsCast::unchecked_ref(value)
+    }
+    pub fn unwrap(self) -> T {
+        JsCast::unchecked_into(self)
+    }
+    pub fn unwrap_ref(&self) -> &T {
+        JsCast::unchecked_ref(self)
     }
 }
-
-impl<T: JsCast> JsCast for Nullable<T> {
-    fn unchecked_from_js(val: JsValue) -> Self {
-        Self(val, PhantomData)
-    }
-    fn unchecked_from_js_ref(val: &JsValue) -> &Self {
-        ref_cast::RefCast::ref_cast(val)
-    }
-}
-
-impl<T: UseInJsCode> UseInJsCode for Nullable<T> {
-    fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.serialize_to(buf)
-    }
-}
-
-impl<T, U: ToJs<T>> ToJs<Nullable<T>> for Nullable<U> {}

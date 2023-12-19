@@ -6,6 +6,7 @@ use crate::{
     protocol::{GET, SET},
     retrieve::RetrieveFuture,
     serialize::{UseInJsCode, UseInJsCodeWriter},
+    JsCast, ToJs,
 };
 
 impl Browser {
@@ -72,6 +73,7 @@ impl Browser {
         };
         JsValue { id, browser }
     }
+
     pub fn set_field(
         &self,
         base_obj: &dyn UseInJsCode,
@@ -93,6 +95,11 @@ impl Browser {
         {
             link.kill(Box::new(CommandSerializeFailed));
         }
+    }
+
+    pub fn new_value<'a, T: JsCast>(&'a self, value: &'a dyn ToJs<T>) -> T {
+        let val = self.value_from_raw_code(format_args!("{}", UseInJsCodeWriter(value)));
+        JsCast::unchecked_from_js(val)
     }
 
     pub fn run_raw_code<'a>(&'a self, code: std::fmt::Arguments<'a>) {

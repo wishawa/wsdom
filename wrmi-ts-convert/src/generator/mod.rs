@@ -1,14 +1,17 @@
 mod alias;
 mod class;
+mod function;
+mod types;
 mod utils;
 
 use std::{borrow::Cow, collections::HashMap};
 
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::parser::{
     comment::WithComment,
+    declare_function::DeclareFunction,
     declare_var::DeclareVar,
     generic::GenericsDeclaration,
     interface::Interface,
@@ -18,27 +21,6 @@ use crate::parser::{
     ts_type::{NamedType, TsType},
 };
 
-mod known_types {
-    use crate::parser::{
-        generic::GenericArgs,
-        ts_type::{NamedType, TsType},
-    };
-
-    pub(crate) const fn simple_named_type(name: &'static str) -> TsType<'static> {
-        TsType::Named {
-            ty: NamedType {
-                name,
-                generic: GenericArgs { args: Vec::new() },
-            },
-        }
-    }
-
-    pub(crate) const NUMBER: TsType = simple_named_type("number");
-    pub(crate) const UNKNOWN: TsType = simple_named_type("unknown");
-    pub(crate) const OBJECT: TsType = simple_named_type("object");
-    pub(crate) const STRING: TsType = simple_named_type("string");
-}
-
 #[derive(Default)]
 struct Context<'a> {
     types: HashMap<&'a str, Interface<'a>>,
@@ -46,104 +28,7 @@ struct Context<'a> {
     declare_globals: HashMap<&'a str, &'a TsType<'a>>,
 }
 
-impl<'a> Context<'a> {
-    fn simplify_type(&self, t: TsType<'a>) -> TsType<'a> {
-        match t {
-            TsType::Named { .. } => t,
-            TsType::Union { pair } => {
-                self.unify_types(self.simplify_type(pair.0), self.simplify_type(pair.1))
-            }
-            TsType::StringLit { .. } => known_types::STRING,
-            TsType::IntLit { .. } => known_types::NUMBER,
-            TsType::Array { item } => TsType::Array {
-                item: Box::new(self.simplify_type(*item)),
-            },
-            TsType::FixedArray { types } => TsType::Array {
-                item: Box::new(
-                    types
-                        .into_iter()
-                        .map(|ty| self.simplify_type(ty))
-                        .reduce(|acc, item| self.unify_types(acc, item))
-                        .unwrap_or(known_types::OBJECT),
-                ),
-            },
-            TsType::PatternString { .. } => known_types::STRING,
-            _ => known_types::OBJECT,
-        }
-    }
-    fn unify_types(&self, t1: TsType<'a>, t2: TsType<'a>) -> TsType<'a> {
-        match (t1, t2) {
-            (u1, u2) if u1 == u2 => u1,
-            (
-                TsType::Named {
-                    ty:
-                        NamedType {
-                            name: n1,
-                            generic: mut g1,
-                        },
-                },
-                TsType::Named {
-                    ty:
-                        NamedType {
-                            name: n2,
-                            generic: g2,
-                        },
-                },
-            ) if n1 == n2 => {
-                g1.args = g1
-                    .args
-                    .into_iter()
-                    .zip(g2.args.into_iter())
-                    .map(|(a1, a2)| self.unify_types(a1, a2))
-                    .collect();
-                TsType::Named {
-                    ty: NamedType {
-                        name: n1,
-                        generic: g1,
-                    },
-                }
-            }
-            (TsType::Array { item: item1 }, TsType::Array { item: item2 }) => TsType::Array {
-                item: Box::new(self.unify_types(*item1, *item2)),
-            },
-            _ => known_types::OBJECT,
-        }
-    }
-
-    fn ts_type_to_rust(&self, t: TsType<'_>) -> TokenStream {
-        match self.simplify_type(t) {
-            TsType::Named { ty } => {
-                let (name, common) = match ty.name {
-                    "unknown" | "any" => ("JsValue", true),
-                    "object" => ("JsObject", true),
-                    "number" => ("JsNumber", true),
-                    "string" => ("JsString", true),
-                    "boolean" => ("JsBoolean", true),
-                    "void" => ("JsUndefined", true),
-                    name => (name, false),
-                };
-                let ident = Ident::new(name, Span::call_site());
-                let prefix = common.then(|| quote! {__wrmi_load_ts_macro::});
-                if ty.generic.args.is_empty() {
-                    quote! {
-                        #prefix #ident
-                    }
-                } else {
-                    let ga = ty.generic.args.into_iter().map(|a| self.ts_type_to_rust(a));
-                    quote! {
-                        #prefix #ident<#(#ga,)*>
-                    }
-                }
-            }
-            TsType::Array { item } => {
-                let inner = self.ts_type_to_rust(*item);
-                quote! { __wrmi_load_ts_macro::JsArray<#inner> }
-            }
-            TsType::KeyOf { .. } => quote! { __wrmi_load_ts_macro::JsString },
-            _ => quote! { __wrmi_load_ts_macro::JsObject },
-        }
-    }
-}
+impl<'a> Context<'a> {}
 pub(crate) fn make_types<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream {
     let mut generated_code = Vec::<TokenStream>::new();
     let mut types = HashMap::new();
@@ -214,6 +99,9 @@ pub(crate) fn make_types<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream {
             }
             Item::TypeAlias(ta) => {
                 generated_code.push(ctx.make_type_alias(ta));
+            }
+            Item::DeclareFunction(df) => {
+                generated_code.push(ctx.make_function(df));
             }
             _ => {}
         }

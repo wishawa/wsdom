@@ -6,9 +6,9 @@ use crate::parser::type_alias::TypeAlias;
 use super::Context;
 
 impl<'a> Context<'a> {
-    pub fn make_type_alias(&self, ta: &TypeAlias<'a>) -> TokenStream {
+    pub(super) fn make_type_alias(&self, ta: &TypeAlias<'a>) -> TokenStream {
         let name = Ident::new(ta.name, Span::call_site());
-        let ty = self.ts_type_to_rust(ta.ty.to_owned());
+        let ty = self.convert_type(ta.ty.to_owned());
         if ta.generics.args.is_empty() {
             quote! {
                 type #name = #ty;
@@ -17,7 +17,7 @@ impl<'a> Context<'a> {
             let generic_args = ta.generics.args.iter().map(|arg| {
                 let name = Ident::new(arg.name, Span::call_site());
                 let extends = arg.extends.clone().map(|b| {
-                    let t = self.ts_type_to_rust(b);
+                    let t = self.convert_type(b);
                     quote! {
                         : ::core::convert::AsRef<#t> + ::core::convert::Into<#t>
                     }

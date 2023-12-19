@@ -27,4 +27,9 @@ mod tests {
         use super::__wrmi_load_ts_macro;
         wrmi_macros::load_ts!("../data-test/math.d.ts");
     }
+    #[test]
+    fn unify_nullable() {
+        use super::__wrmi_load_ts_macro;
+        wrmi_macros::load_ts!("../data-test/unify_null.d.ts");
+    }
 }
