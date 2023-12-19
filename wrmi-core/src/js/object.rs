@@ -43,4 +43,4 @@ impl UseInJsCode for JsObject {
     }
 }
 
-impl ToJs<JsObject> for JsObject {}
+// impl ToJs<JsObject> for JsObject {}

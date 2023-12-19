@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{js::value::JsValue, js_cast::JsCast, serialize::UseInJsCode};
+use crate::{js::value::JsValue, js_cast::JsCast, serialize::UseInJsCode, ToJs};
 
 #[derive(Clone, ref_cast::RefCast)]
 #[repr(transparent)]
@@ -32,3 +32,5 @@ impl<T: UseInJsCode> UseInJsCode for Nullable<T> {
         self.0.serialize_to(buf)
     }
 }
+
+impl<T, U: ToJs<T>> ToJs<Nullable<T>> for Nullable<U> {}

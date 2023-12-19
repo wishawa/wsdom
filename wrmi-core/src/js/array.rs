@@ -49,16 +49,15 @@ impl<T> std::ops::Deref for JsArray<T> {
 }
 impl<T> JsArray<T> {}
 
-impl<'a, T, U> ToJs<JsArray<T>> for &'a [U]
-where
-    T: JsCast,
-    U: serde::Serialize + ToJs<T>,
-{
-}
+// impl<'a, T, U> ToJs<JsArray<T>> for &'a [U]
+// where
+//     T: JsCast,
+//     U: serde::Serialize + ToJs<T>,
+// {
+// }
 
-impl<T, U> ToJs<JsArray<T>> for JsArray<U>
-where
-    T: ToJs<U>,
-    U: JsCast,
-{
-}
+// impl<T> ToJs<JsArray<T>> for JsArray<T>
+// where
+//     T: JsCast + ToJs<T>
+// {
+// }

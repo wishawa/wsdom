@@ -21,7 +21,9 @@ impl UseInJsCode for JsValue {
     }
 }
 
-impl<T: Serialize + ?Sized> UseInJsCode for T {
+pub struct SerdeToJs<'a, T: ?Sized>(pub &'a T);
+
+impl<'a, T: Serialize + ?Sized> UseInJsCode for SerdeToJs<'a, T> {
     fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         struct WriteAdapter<'a, 'b>(&'a mut std::fmt::Formatter<'b>);
         impl<'a, 'b> std::io::Write for WriteAdapter<'a, 'b> {
@@ -39,7 +41,7 @@ impl<T: Serialize + ?Sized> UseInJsCode for T {
                 Ok(())
             }
         }
-        match serde_json::to_writer(&mut WriteAdapter(buf), self) {
+        match serde_json::to_writer(&mut WriteAdapter(buf), self.0) {
             Ok(()) => Ok(()),
             Err(_) => Err(std::fmt::Error),
         }
@@ -72,5 +74,4 @@ where
 {
 }
 
-// Anything that is serializable can be serialized into some JS value.
-impl<T: UseInJsCode> ToJs<JsValue> for T {}
+impl<T> ToJs<T> for T where T: UseInJsCode + JsCast {}

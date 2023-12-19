@@ -108,7 +108,7 @@ impl<'a> Context<'a> {
                 }
             }
 
-            impl #generics_with_bound __wrmi_load_ts_macro::ToJs< #name #generics_with_bound > for #name #generics_with_bound {}
+            // impl #generics_with_bound __wrmi_load_ts_macro::ToJs< #name #generics_with_bound > for #name #generics_with_bound {}
         };
 
         let tokens = {
