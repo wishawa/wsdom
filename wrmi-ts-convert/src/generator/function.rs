@@ -26,7 +26,7 @@ impl<'a> Context<'a> {
                 .map(|ty| self.convert_type(ty))
                 .into_iter();
             quote! {
-                #name #(: ::core::convert::AsRef<#extends> + ::core::convert::Into<#extends>)*
+                #name: __wrmi_load_ts_macro::JsCast #(+ ::core::convert::AsRef<#extends> + ::core::convert::Into<#extends>)*
             }
         });
         let function_generics = if df.generics.args.is_empty() {

@@ -185,7 +185,7 @@ impl<'a> Context<'a> {
                     "this" => return quote! { Self },
                     "__translate_nullish" => ("JsNullish", true),
                     "__translate_nullable" => ("JsNullable", true),
-                    "__translate_array" | "ReadonlyArray" => ("Array", true),
+                    "__translate_array" | "ReadonlyArray" => ("Array", false),
                     name => (name, false),
                 };
                 let ident = new_ident_safe(name);
