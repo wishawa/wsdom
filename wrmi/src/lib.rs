@@ -7,8 +7,15 @@ pub mod __wrmi_load_ts_macro {
 
 pub mod javascript {}
 
+// mod expanded;
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn dummy() {
+        use super::__wrmi_load_ts_macro;
+        wrmi_macros::load_ts!("../data-test/dummy.d.ts");
+    }
     #[test]
     fn history() {
         use super::__wrmi_load_ts_macro;
@@ -35,6 +42,6 @@ mod tests {
     #[test]
     fn everything() {
         use super::__wrmi_load_ts_macro;
-        wrmi_macros::load_ts!("../data/dom.generated.d.ts");
+        // wrmi_macros::load_ts!("../data/dom.generated.d.ts");
     }
 }

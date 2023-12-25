@@ -65,7 +65,7 @@ impl<'a> Parsable<'a> for MethodArg<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum MethodName<'a> {
     Nothing,
     Constructor,

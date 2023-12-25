@@ -38,15 +38,18 @@ pub(crate) fn quote_backslash_escape<'a>(
 ) -> impl Parser<&'a str, &'a str, winnow::error::ContextError> {
     move |input: &mut &'a str| -> PResult<&'a str> {
         let _first = quote.parse_next(input)?;
+        let full_input = *input;
         let mut escaped = false;
         loop {
             escaped = match (escaped, any.parse_next(input)) {
                 (true, Ok(_)) => false,
                 (false, Ok('\\')) => true,
-                (false, Ok(ch)) if ch == quote => return Ok(""),
+                (false, Ok(ch)) if ch == quote => {
+                    return Ok(&full_input[..(full_input.len() - input.len() - 1)])
+                }
                 (false, Ok(_)) => false,
                 (_, Err(e)) => return Err(e),
-            }
+            };
         }
     }
 }

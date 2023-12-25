@@ -1,5 +1,5 @@
 use crate::{
-    generator::utils::{new_ident_safe, to_snake_case},
+    generator::util::{new_ident_safe, to_snake_case},
     parser::declare_function::DeclareFunction,
 };
 use proc_macro2::TokenStream;

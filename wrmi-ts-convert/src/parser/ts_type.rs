@@ -34,6 +34,9 @@ pub(crate) enum TsType<'a> {
     IntLit {
         int: i32,
     },
+    BoolLit {
+        bool: bool,
+    },
     Array {
         item: Box<TsType<'a>>,
     },
@@ -75,6 +78,9 @@ impl<'a> TsType<'a> {
             // int literal
             preceded("0x", hex_uint).map(|int: u32| Self::IntLit { int: int as _ }),
             dec_int.map(|int| Self::IntLit { int }),
+            // boolean literal
+            "false".map(|_| Self::BoolLit { bool: false }),
+            "true".map(|_| Self::BoolLit { bool: true }),
             // named
             NamedType::parse.map(|ty| Self::Named { ty }),
             // fixed array

@@ -3,11 +3,20 @@ use std::borrow::Cow;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::parser::{comment::WithComment, interface::Interface, member::Member, ts_type::TsType};
+use crate::{
+    generator::util::{iter_dedupe_all, iter_dedupe_consecutive},
+    parser::{
+        comment::WithComment,
+        field::{Field, FieldName},
+        interface::Interface,
+        member::Member,
+        ts_type::TsType,
+    },
+};
 
 use super::{
     types::known_types,
-    utils::{new_ident_safe, to_snake_case},
+    util::{new_ident_safe, to_snake_case},
     Context,
 };
 
@@ -19,46 +28,58 @@ impl<'a> Context<'a> {
     ) -> TokenStream {
         let name = new_ident_safe(interface.name);
 
-        let (generics_with_bound, generics_without_bound) = if interface.generics.args.is_empty() {
-            (None, None)
+        let (
+            generics_with_bound,
+            generics_without_bound,
+            generics_with_default,
+            generics_for_phantom,
+        ) = if interface.generics.args.is_empty() {
+            (None, None, None, quote! {<()>})
         } else {
-            let with_bounds = interface.generics.args.iter().map(|arg| {
+            let with_bounds_with_defaults = interface.generics.args.iter().map(|arg| {
                 let name = new_ident_safe(arg.name);
-                match &arg.extends {
-                    Some(t) => {
-                        let bound = self.convert_type(t.to_owned());
-                        quote! {
-                            #name: AsRef<#bound>
-                        }
+                let extends = arg.extends.clone().map(|t| {
+                    let t = self.convert_type(t);
+                    quote! {
+                        : AsRef<#t>
                     }
-                    None => {
-                        quote! {
-                            #name
-                        }
+                });
+                let default = arg.default.clone().map(|t| {
+                    let t = self.convert_type(t);
+                    quote! {
+                        = #t
                     }
-                }
+                });
+                (
+                    quote! {
+                        #name #extends
+                    },
+                    quote! {
+                        #name #extends #default
+                    },
+                )
             });
+            let with_bounds = with_bounds_with_defaults.clone().map(|(b, _d)| b);
+            let with_defaults = with_bounds_with_defaults.map(|(_b, d)| d);
             let without_bounds = interface.generics.args.iter().map(|arg| {
                 let name = new_ident_safe(arg.name);
                 quote! {
                     #name
                 }
             });
+            let without_bounds_tokens = quote! {#(#without_bounds,)*};
             (
                 Some(quote! { <#(#with_bounds,)*> }),
-                Some(quote! { <#(#without_bounds,)*> }),
+                Some(quote! { <#without_bounds_tokens> }),
+                Some(quote! { <#(#with_defaults,)*> }),
+                quote! {<(#without_bounds_tokens)>},
             )
         };
-
-        let generics_for_phantom = generics_without_bound
-            .as_ref()
-            .map(Cow::Borrowed)
-            .unwrap_or_else(|| Cow::Owned(quote! {<()>}));
 
         let tokens = quote! {
             #[derive(::core::clone::Clone, __wrmi_load_ts_macro::RefCast)]
             #[repr(transparent)]
-            pub struct #name #generics_with_bound (__wrmi_load_ts_macro::JsValue, ::core::marker::PhantomData #generics_for_phantom );
+            pub struct #name #generics_with_default (__wrmi_load_ts_macro::JsValue, ::core::marker::PhantomData #generics_for_phantom );
         };
 
         let extends = interface
@@ -105,7 +126,7 @@ impl<'a> Context<'a> {
                 }
             )*
 
-            impl #generics_with_bound std::ops::Deref for #name #generics_with_bound {
+            impl #generics_with_bound std::ops::Deref for #name #generics_without_bound {
                 type Target = #first_extend;
                 fn deref(&self) -> &Self::Target {
                     self.as_ref()
@@ -116,14 +137,28 @@ impl<'a> Context<'a> {
         };
 
         let tokens = {
-            let member_code =
-                interface
-                    .members
-                    .iter()
-                    .filter_map(|member| self.make_member_code(interface.name, &member.data, true))
-                    .chain(decl_members.iter().flat_map(|member| {
-                        self.make_member_code(interface.name, &member.data, false)
-                    }));
+            let member_code = iter_dedupe_all(
+                iter_dedupe_consecutive(
+                    decl_members
+                        .iter()
+                        .map(|member| (member, false))
+                        .chain(interface.members.iter().map(|member| (member, true))),
+                    |(member, _)| match &member.data {
+                        Member::Method(m) => Some(&m.name),
+                        _ => None,
+                    },
+                ),
+                |(member, _)| match &member.data {
+                    Member::Field(Field {
+                        name: FieldName::Name(name),
+                        ..
+                    }) => Some(*name),
+                    _ => None,
+                },
+            )
+            .filter_map(|(member, on_instance)| {
+                self.make_member_code(interface.name, &member.data, on_instance)
+            });
 
             quote! {
                 #tokens
@@ -185,20 +220,29 @@ impl<'a> Context<'a> {
                         }
                     })
                 } else {
-                    let function = if is_constructor {
-                        format!("new {}", interface_name)
+                    if is_constructor {
+                        let function = format!("new {}", interface_name);
+                        Some(quote! {
+                            pub fn #method_name_ident (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
+                                __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                                    browser.call_function(#function, [
+                                        #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
+                                    ], #last_arg_variadic)
+                                )
+                            }
+                        })
                     } else {
-                        format!("{}.{}", interface_name, method_name_str)
-                    };
-                    Some(quote! {
-                        pub fn #method_name_ident #method_generics (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
-                            __wrmi_load_ts_macro::JsCast::unchecked_from_js(
-                                browser.call_function(#function, [
-                                    #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
-                                ], #last_arg_variadic)
-                            )
-                        }
-                    })
+                        let function = format!("{}.{}", interface_name, method_name_str);
+                        Some(quote! {
+                            pub fn #method_name_ident #method_generics (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
+                                __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                                    browser.call_function(#function, [
+                                        #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
+                                    ], #last_arg_variadic)
+                                )
+                            }
+                        })
+                    }
                 }
             }
             Member::Field(field) => {

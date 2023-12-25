@@ -5,7 +5,7 @@ use crate::parser::{
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use super::{utils::new_ident_safe, Context};
+use super::{util::new_ident_safe, Context};
 
 pub(super) mod known_types {
     use crate::parser::{
@@ -23,6 +23,7 @@ pub(super) mod known_types {
     }
 
     pub(crate) const NUMBER: TsType = simple_named_type("number");
+    pub(crate) const BOOLEAN: TsType = simple_named_type("boolean");
     pub(crate) const UNKNOWN: TsType = simple_named_type("unknown");
     pub(crate) const OBJECT: TsType = simple_named_type("object");
     pub(crate) const STRING: TsType = simple_named_type("string");
@@ -44,12 +45,20 @@ impl<'a> Context<'a> {
                     generic: Default::default(),
                 },
             },
+            TsType::Named {
+                ty:
+                    NamedType {
+                        name: "Exclude",
+                        generic: GenericArgs { args },
+                    },
+            } => args.into_iter().rev().next().unwrap_or(known_types::OBJECT),
             TsType::Named { .. } => t,
             TsType::Union { pair } => {
                 self.unify_types(self.simplify_type(pair.0), self.simplify_type(pair.1))
             }
             TsType::StringLit { .. } => known_types::STRING,
             TsType::IntLit { .. } => known_types::NUMBER,
+            TsType::BoolLit { .. } => known_types::BOOLEAN,
             TsType::Array { item } => TsType::Array {
                 item: Box::new(self.simplify_type(*item)),
             },

@@ -3,7 +3,7 @@ use quote::quote;
 
 use crate::parser::type_alias::TypeAlias;
 
-use super::{utils::new_ident_safe, Context};
+use super::{util::new_ident_safe, Context};
 
 impl<'a> Context<'a> {
     pub(super) fn make_type_alias(&self, ta: &TypeAlias<'a>) -> TokenStream {

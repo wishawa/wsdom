@@ -55,7 +55,7 @@ pub fn convert(
         }
     };
 
-    let types = generator::make_types(&parsed);
+    let types = generator::generate_all(&parsed);
 
     Ok(types)
 }

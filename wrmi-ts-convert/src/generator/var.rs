@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::{generator::utils::new_ident_safe, parser::ts_type::TsType};
+use crate::{generator::util::new_ident_safe, parser::ts_type::TsType};
 
 use super::Context;
 
