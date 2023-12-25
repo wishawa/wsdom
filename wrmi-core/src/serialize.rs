@@ -70,8 +70,7 @@ impl<'a> UseInJsCode for RawCodeImmediate<'a> {
 pub trait ToJs<JsType>
 where
     Self: UseInJsCode,
-    JsType: JsCast,
 {
 }
 
-impl<T> ToJs<T> for T where T: UseInJsCode + JsCast {}
+impl<T> ToJs<T> for T where T: UseInJsCode {}

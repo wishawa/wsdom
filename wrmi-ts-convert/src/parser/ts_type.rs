@@ -58,6 +58,14 @@ pub(crate) enum TsType<'a> {
     PatternString {
         pattern: &'a str,
     },
+    TsIs {
+        expr: Expr<'a>,
+        ty: Box<TsType<'a>>,
+    },
+    Namespaced {
+        ns: &'a str,
+        ty: NamedType<'a>,
+    },
 }
 
 impl<'a> TsType<'a> {
@@ -78,6 +86,14 @@ impl<'a> TsType<'a> {
             // int literal
             preceded("0x", hex_uint).map(|int: u32| Self::IntLit { int: int as _ }),
             dec_int.map(|int| Self::IntLit { int }),
+            separated_pair(Expr::parse, token_word("is"), TsType::parse).map(|(expr, ty)| {
+                Self::TsIs {
+                    expr,
+                    ty: Box::new(ty),
+                }
+            }),
+            separated_pair(word1, token('.'), NamedType::parse)
+                .map(|(ns, ty)| Self::Namespaced { ns, ty }),
             // boolean literal
             "false".map(|_| Self::BoolLit { bool: false }),
             "true".map(|_| Self::BoolLit { bool: true }),

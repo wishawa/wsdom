@@ -1,5 +1,5 @@
 use winnow::{
-    combinator::{delimited, opt, separated_pair},
+    combinator::{delimited, opt, preceded, separated_pair},
     Parser,
 };
 
@@ -19,7 +19,7 @@ pub(crate) struct TypeAlias<'a> {
 impl<'a> Parsable<'a> for TypeAlias<'a> {
     fn parse(input: &mut &'a str) -> winnow::PResult<Self> {
         delimited(
-            token_word("type"),
+            preceded(opt(token_word("declare")), token_word("type")),
             separated_pair(
                 (word1, opt(GenericsDeclaration::parse)),
                 token('='),

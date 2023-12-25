@@ -1,12 +1,11 @@
 use winnow::{
-    ascii::multispace1,
-    combinator::{alt, delimited, opt, separated_pair, terminated},
+    combinator::{alt, delimited, opt, separated_pair},
     PResult, Parser,
 };
 
 use super::{
     ts_type::TsType,
-    util::{quote_backslash_escape, token, word1, Parsable},
+    util::{quote_backslash_escape, token, token_word, word1, Parsable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,7 +19,7 @@ impl<'a> Parsable<'a> for Field<'a> {
     fn parse(input: &mut &'a str) -> PResult<Self> {
         separated_pair(
             (
-                opt(terminated("readonly", multispace1)),
+                opt(token_word("readonly")),
                 FieldName::parse,
                 opt(token('?')),
             ),

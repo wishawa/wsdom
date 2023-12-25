@@ -1,5 +1,4 @@
 mod alias;
-mod ban;
 mod class;
 mod function;
 mod types;
@@ -15,7 +14,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::{
-    generator::{ban::check_declare_var, util::iter_dedupe_consecutive},
+    generator::util::iter_dedupe_consecutive,
     parser::{
         comment::WithComment,
         declare_var::DeclareVar,
@@ -31,6 +30,7 @@ use crate::{
 #[derive(Default)]
 struct Context<'a> {
     types: HashMap<&'a str, Interface<'a>>,
+    inhr_tree: HashMap<&'a str, Vec<NamedType<'a>>>,
     aliases: HashMap<&'a str, (GenericsDeclaration<'a>, TsType<'a>)>,
     declare_globals: HashMap<&'a str, &'a TsType<'a>>,
 }
@@ -40,10 +40,22 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
     let mut types = HashMap::new();
     let mut aliases = HashMap::new();
     let mut declare_globals = HashMap::new();
+    let mut inhr_tree = HashMap::<_, Vec<_>>::new();
     for item in dts {
         match &item.data {
             Item::Interface(interface) => {
                 let interface = interface.clone();
+                for extend in &interface.extends {
+                    match extend {
+                        TsType::Named { ty } => {
+                            inhr_tree
+                                .entry(interface.name)
+                                .or_default()
+                                .push(ty.clone());
+                        }
+                        _ => {}
+                    }
+                }
                 types.insert(interface.name, interface);
             }
             Item::TypeAlias(alias) => {
@@ -60,6 +72,7 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
         types,
         aliases,
         declare_globals,
+        inhr_tree,
     };
     let mut classes_made = HashSet::new();
     for dv in dts.iter().filter_map(|item| match &item.data {
@@ -67,9 +80,6 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
         _ => None,
     }) {
         let DeclareVar { name, ty } = dv;
-        if !check_declare_var(name) {
-            continue;
-        }
         if name
             .chars()
             .next()

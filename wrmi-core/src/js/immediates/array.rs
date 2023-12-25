@@ -1,13 +1,6 @@
 use std::fmt::Write;
 
-use crate::{js::array::JsArray, JsCast, ToJs, UseInJsCode};
-
-impl<T, U> ToJs<JsArray<T>> for [U]
-where
-    T: JsCast,
-    U: ToJs<T>,
-{
-}
+use crate::UseInJsCode;
 
 impl<U> UseInJsCode for [U]
 where

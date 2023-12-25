@@ -3,11 +3,8 @@ pub use wrmi_macros::load_ts;
 pub mod __wrmi_load_ts_macro {
     pub use ref_cast::RefCast;
     pub use wrmi_core::{js_types::*, Browser, JsCast, ToJs, UseInJsCode};
+    pub use wrmi_javascript::Array;
 }
-
-pub mod javascript {}
-
-// mod expanded;
 
 #[cfg(test)]
 mod tests {
@@ -39,9 +36,10 @@ mod tests {
         use super::__wrmi_load_ts_macro;
         wrmi_macros::load_ts!("../data-test/unify_null.d.ts");
     }
+
     #[test]
-    fn everything() {
+    fn generic() {
         use super::__wrmi_load_ts_macro;
-        // wrmi_macros::load_ts!("../data/dom.generated.d.ts");
+        wrmi_macros::load_ts!("../data-test/generic.d.ts");
     }
 }

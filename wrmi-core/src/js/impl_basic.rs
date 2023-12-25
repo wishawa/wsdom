@@ -27,6 +27,12 @@ macro_rules! impl_basic {
                 self.0.serialize_to(buf)
             }
         }
+
+        impl $(<$generic>)? AsRef<Self> for $name $(<$generic>)? {
+            fn as_ref(&self) -> & Self {
+                self
+            }
+        }
     };
     ($name:ident) => {
         impl_basic!($name;;JsValue);

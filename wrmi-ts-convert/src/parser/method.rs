@@ -15,12 +15,14 @@ pub(crate) struct Method<'a> {
     pub generics: GenericsDeclaration<'a>,
     pub args: Vec<MethodArg<'a>>,
     pub ret: TsType<'a>,
+    pub optional: bool,
 }
 impl<'a> Parsable<'a> for Method<'a> {
     fn parse(input: &mut &'a str) -> PResult<Self> {
         separated_pair(
             (
                 MethodName::parse,
+                opt(token("?")),
                 opt(GenericsDeclaration::parse),
                 delimited(
                     token('('),
@@ -32,11 +34,12 @@ impl<'a> Parsable<'a> for Method<'a> {
             TsType::parse,
         )
         .parse_next(input)
-        .map(|((name, generics, args), ret)| Self {
+        .map(|((name, optional, generics, args), ret)| Self {
             name,
             generics: generics.unwrap_or_default(),
             args,
             ret,
+            optional: optional.is_some(),
         })
     }
 }

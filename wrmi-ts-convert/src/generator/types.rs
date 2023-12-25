@@ -48,30 +48,56 @@ impl<'a> Context<'a> {
             TsType::Named {
                 ty:
                     NamedType {
-                        name: "Exclude",
+                        name: "Exclude" | "Readonly",
                         generic: GenericArgs { args },
                     },
-            } => args.into_iter().rev().next().unwrap_or(known_types::OBJECT),
-            TsType::Named { .. } => t,
+            } => args.into_iter().next().unwrap_or(known_types::OBJECT),
+            TsType::Named {
+                ty: NamedType { name: "Record", .. },
+            } => known_types::OBJECT,
+            TsType::Named {
+                ty:
+                    NamedType {
+                        name,
+                        generic: GenericArgs { args },
+                    },
+            } => TsType::Named {
+                ty: NamedType {
+                    name,
+                    generic: GenericArgs {
+                        args: args.into_iter().map(|t| self.simplify_type(t)).collect(),
+                    },
+                },
+            },
             TsType::Union { pair } => {
                 self.unify_types(self.simplify_type(pair.0), self.simplify_type(pair.1))
             }
             TsType::StringLit { .. } => known_types::STRING,
             TsType::IntLit { .. } => known_types::NUMBER,
             TsType::BoolLit { .. } => known_types::BOOLEAN,
-            TsType::Array { item } => TsType::Array {
-                item: Box::new(self.simplify_type(*item)),
+            TsType::Array { item } => TsType::Named {
+                ty: NamedType {
+                    name: "__translate_array",
+                    generic: GenericArgs {
+                        args: vec![self.simplify_type(*item)],
+                    },
+                },
             },
-            TsType::FixedArray { types } => TsType::Array {
-                item: Box::new(
-                    types
-                        .into_iter()
-                        .map(|ty| self.simplify_type(ty))
-                        .reduce(|acc, item| self.unify_types(acc, item))
-                        .unwrap_or(known_types::OBJECT),
-                ),
+            TsType::FixedArray { types } => TsType::Named {
+                ty: NamedType {
+                    name: "__translate_array",
+                    generic: GenericArgs {
+                        args: vec![types
+                            .into_iter()
+                            .map(|ty| self.simplify_type(ty))
+                            .reduce(|acc, item| self.unify_types(acc, item))
+                            .unwrap_or(known_types::OBJECT)],
+                    },
+                },
             },
             TsType::PatternString { .. } => known_types::STRING,
+            TsType::TsIs { .. } => known_types::BOOLEAN,
+            TsType::KeyOf { .. } => known_types::STRING,
             _ => known_types::OBJECT,
         }
     }
@@ -142,10 +168,6 @@ impl<'a> Context<'a> {
                     generic: GenericArgs { args: vec![u1] },
                 },
             },
-
-            (TsType::Array { item: item1 }, TsType::Array { item: item2 }) => TsType::Array {
-                item: Box::new(self.unify_types(*item1, *item2)),
-            },
             _ => known_types::OBJECT,
         }
     }
@@ -159,8 +181,11 @@ impl<'a> Context<'a> {
                     "number" => ("JsNumber", true),
                     "string" => ("JsString", true),
                     "boolean" => ("JsBoolean", true),
+                    "symbol" => ("JsSymbol", true),
+                    "this" => return quote! { Self },
                     "__translate_nullish" => ("JsNullish", true),
                     "__translate_nullable" => ("JsNullable", true),
+                    "__translate_array" | "ReadonlyArray" => ("Array", true),
                     name => (name, false),
                 };
                 let ident = new_ident_safe(name);
@@ -176,11 +201,6 @@ impl<'a> Context<'a> {
                     }
                 }
             }
-            TsType::Array { item } => {
-                let inner = self.convert_type(*item);
-                quote! { __wrmi_load_ts_macro::JsArray<#inner> }
-            }
-            TsType::KeyOf { .. } => quote! { __wrmi_load_ts_macro::JsString },
             _ => quote! { __wrmi_load_ts_macro::JsObject },
         }
     }

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -10,7 +8,7 @@ use crate::{
         field::{Field, FieldName},
         interface::Interface,
         member::Member,
-        ts_type::TsType,
+        ts_type::{NamedType, TsType},
     },
 };
 
@@ -21,6 +19,15 @@ use super::{
 };
 
 impl<'a> Context<'a> {
+    fn get_all_ancestors<'s: 'o, 'o>(&'s self, name: &str, out: &mut Vec<&'o NamedType<'o>>) {
+        let ancs = match self.inhr_tree.get(name) {
+            Some(x) => x,
+            _ => return,
+        };
+        out.extend(ancs.iter());
+        ancs.iter()
+            .for_each(|anc| self.get_all_ancestors(anc.name, out));
+    }
     pub(super) fn make_class(
         &self,
         interface: &Interface<'_>,
@@ -38,12 +45,17 @@ impl<'a> Context<'a> {
         } else {
             let with_bounds_with_defaults = interface.generics.args.iter().map(|arg| {
                 let name = new_ident_safe(arg.name);
-                let extends = arg.extends.clone().map(|t| {
-                    let t = self.convert_type(t);
+                let mut extends = Vec::new();
+                self.get_all_ancestors(arg.name, &mut extends);
+                let extends = extends.iter().clone().map(|t| {
+                    let t = self.convert_type(TsType::Named {
+                        ty: (*t).to_owned(),
+                    });
                     quote! {
-                        : AsRef<#t>
+                        + ::core::convert::AsRef<#t>
                     }
                 });
+                let extends_cloned = extends.clone();
                 let default = arg.default.clone().map(|t| {
                     let t = self.convert_type(t);
                     quote! {
@@ -52,10 +64,10 @@ impl<'a> Context<'a> {
                 });
                 (
                     quote! {
-                        #name #extends
+                        #name: __wrmi_load_ts_macro::JsCast #(+ #extends)*
                     },
                     quote! {
-                        #name #extends #default
+                        #name: __wrmi_load_ts_macro::JsCast #(+ #extends_cloned)* #default
                     },
                 )
             });
@@ -82,12 +94,37 @@ impl<'a> Context<'a> {
             pub struct #name #generics_with_default (__wrmi_load_ts_macro::JsValue, ::core::marker::PhantomData #generics_for_phantom );
         };
 
-        let extends = interface
+        let mut ancestors = Vec::new();
+
+        static ALWAYS_EXTENDED: &[TsType<'static>] = &[known_types::UNKNOWN, known_types::OBJECT];
+        interface
             .extends
             .iter()
-            .map(ToOwned::to_owned)
-            .chain([known_types::UNKNOWN, known_types::OBJECT].into_iter())
+            .chain(ALWAYS_EXTENDED.iter())
+            .for_each(|ty| match ty {
+                TsType::Named {
+                    ty: ty @ NamedType { name, .. },
+                } => {
+                    self.get_all_ancestors(name, &mut ancestors);
+                    ancestors.push(ty);
+                }
+                _ => {}
+            });
+        ancestors.sort_by_key(|item| item.name);
+        ancestors.dedup_by_key(|item| item.name);
+
+        let extends = ancestors
+            .iter()
+            .map(|anc| TsType::Named {
+                ty: (*anc).to_owned(),
+            })
             .map(|iface| self.convert_type(iface.to_owned()));
+        // let extends = interface
+        //     .extends
+        //     .iter()
+        //     .map(ToOwned::to_owned)
+        //     .chain([known_types::UNKNOWN, known_types::OBJECT].into_iter())
+        //     .map(|iface| self.convert_type(iface.to_owned()));
         let first_extend = self.convert_type(
             interface
                 .extends
@@ -110,6 +147,12 @@ impl<'a> Context<'a> {
             impl #generics_with_bound __wrmi_load_ts_macro::UseInJsCode for #name #generics_without_bound {
                 fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     self.0.serialize_to(buf)
+                }
+            }
+
+            impl #generics_with_bound ::core::convert::AsRef<Self> for #name #generics_without_bound {
+                fn as_ref(&self) -> &Self {
+                    self
                 }
             }
 
@@ -199,7 +242,7 @@ impl<'a> Context<'a> {
                     let name = new_ident_safe(gen.name);
                     let extends = gen.extends.clone().map(|ty| self.convert_type(ty)).into_iter();
                     quote! {
-                        #name #(: ::core::convert::AsRef<#extends> + ::core::convert::Into<#extends>)*
+                        #name: __wrmi_load_ts_macro::JsCast #(+ ::core::convert::AsRef<#extends> + ::core::convert::Into<#extends>)*
                     }
                 });
                 let method_generics = if method.generics.args.is_empty() {

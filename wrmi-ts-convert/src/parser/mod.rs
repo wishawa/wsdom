@@ -1,4 +1,5 @@
 use winnow::{
+    ascii::line_ending,
     combinator::{delimited, repeat},
     PResult, Parser,
 };
@@ -25,6 +26,14 @@ pub(crate) mod util;
 pub(crate) fn parse_all<'a>(
     input: &mut &'a str,
 ) -> PResult<Vec<comment::WithComment<'a, item::Item<'a>>>> {
+    loop {
+        if line_ending::<_, winnow::error::ContextError>
+            .parse_next(input)
+            .is_err()
+        {
+            break;
+        }
+    }
     loop {
         if comment::Comment::parse.parse_next(input).is_err() {
             break;
@@ -116,7 +125,8 @@ declare var Element: {
                                             name: "Element",
                                             generic: Default::default()
                                         }
-                                    }
+                                    },
+                                    optional: false
                                 })
                             }
                         ]
