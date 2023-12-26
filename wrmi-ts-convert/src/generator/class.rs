@@ -244,11 +244,10 @@ impl<'a> Context<'a> {
                     })
                 } else {
                     if is_constructor {
-                        let function = format!("new {}", interface_name);
                         Some(quote! {
                             pub fn #method_name_ident (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
                                 __wrmi_load_ts_macro::JsCast::unchecked_from_js(
-                                    browser.call_function(#function, [
+                                    browser.call_constructor(#interface_name, [
                                         #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
                                     ], #last_arg_variadic)
                                 )

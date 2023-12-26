@@ -19,6 +19,15 @@ impl Browser {
         self.call_function_inner(&format_args!("{}", function_name), args, last_arg_variadic)
     }
 
+    pub fn call_constructor<'a>(
+        &'a self,
+        class_name: &'a str,
+        args: impl IntoIterator<Item = &'a dyn UseInJsCode>,
+        last_arg_variadic: bool,
+    ) -> JsValue {
+        self.call_function_inner(&format_args!("new {}", class_name), args, last_arg_variadic)
+    }
+
     fn call_function_inner<'a>(
         &'a self,
         function: &std::fmt::Arguments<'_>,
@@ -26,11 +35,9 @@ impl Browser {
         last_arg_variadic: bool,
     ) -> JsValue {
         let id = {
-            let link = self.0.lock();
-            let mut link = link.borrow_mut();
+            let mut link = self.0.lock().unwrap();
             let out_id = link.get_new_id();
             write!(link.raw_commands_buf(), "{SET}({out_id},{function}(").unwrap();
-            // for arg in args.into_iter() {
             let mut iter = args.into_iter().peekable();
             while let Some(arg) = iter.next() {
                 let arg = UseInJsCodeWriter(arg);
@@ -43,8 +50,8 @@ impl Browser {
                     link.kill(Box::new(CommandSerializeFailed));
                 }
             }
-            // }
             write!(link.raw_commands_buf(), "));\n").unwrap();
+            link.wake_outgoing();
             out_id
         };
         JsValue {
@@ -56,8 +63,7 @@ impl Browser {
     pub fn get_field(&self, base_obj: &dyn UseInJsCode, property: &dyn UseInJsCode) -> JsValue {
         let browser = self.clone();
         let id = {
-            let link = browser.0.lock();
-            let mut link = link.borrow_mut();
+            let mut link = browser.0.lock().unwrap();
             let out_id = link.get_new_id();
             let base_obj = UseInJsCodeWriter(base_obj);
             let property = UseInJsCodeWriter(property);
@@ -69,6 +75,7 @@ impl Browser {
             {
                 link.kill(Box::new(CommandSerializeFailed));
             }
+            link.wake_outgoing();
             out_id
         };
         JsValue { id, browser }
@@ -80,8 +87,7 @@ impl Browser {
         property: &dyn UseInJsCode,
         value: &dyn UseInJsCode,
     ) {
-        let link = self.0.lock();
-        let mut link = link.borrow_mut();
+        let mut link = self.0.lock().unwrap();
         let (base_obj, property, value) = (
             UseInJsCodeWriter(base_obj),
             UseInJsCodeWriter(property),
@@ -95,6 +101,7 @@ impl Browser {
         {
             link.kill(Box::new(CommandSerializeFailed));
         }
+        link.wake_outgoing();
     }
 
     pub fn new_value<'a, T: JsCast>(&'a self, value: &'a dyn ToJs<T>) -> T {
@@ -103,16 +110,18 @@ impl Browser {
     }
 
     pub fn run_raw_code<'a>(&'a self, code: std::fmt::Arguments<'a>) {
-        let link = self.0.lock();
-        let mut link = link.borrow_mut();
-        link.send_command(code);
+        let mut link = self.0.lock().unwrap();
+        if write!(link.raw_commands_buf(), "{{ {code} }}").is_err() {
+            link.kill(Box::new(CommandSerializeFailed));
+        }
+        link.wake_outgoing();
     }
 
     pub fn value_from_raw_code<'a>(&'a self, code: std::fmt::Arguments<'a>) -> JsValue {
-        let link = self.0.lock();
-        let mut link = link.borrow_mut();
+        let mut link = self.0.lock().unwrap();
         let out_id = link.get_new_id();
         write!(link.raw_commands_buf(), "{SET}({out_id},{code});").unwrap();
+        link.wake_outgoing();
         JsValue {
             id: out_id,
             browser: self.to_owned(),
@@ -134,8 +143,7 @@ impl JsObject {
     pub fn js_get_field(&self, property: &dyn UseInJsCode) -> JsValue {
         let browser = self.browser.clone();
         let id = {
-            let link = browser.0.lock();
-            let mut link = link.borrow_mut();
+            let mut link = browser.0.lock().unwrap();
             let out_id = link.get_new_id();
             let self_id = self.id;
             let property = UseInJsCodeWriter(property);
@@ -147,14 +155,14 @@ impl JsObject {
             {
                 link.kill(Box::new(CommandSerializeFailed));
             }
+            link.wake_outgoing();
             out_id
         };
         JsValue { id, browser }
     }
     pub fn js_set_field(&self, property: &dyn UseInJsCode, value: &dyn UseInJsCode) {
         let self_id = self.id;
-        let link = self.browser.0.lock();
-        let mut link = link.borrow_mut();
+        let mut link = self.browser.0.lock().unwrap();
         let (property, value) = (UseInJsCodeWriter(property), UseInJsCodeWriter(value));
         if write!(
             link.raw_commands_buf(),
@@ -164,6 +172,7 @@ impl JsObject {
         {
             link.kill(Box::new(CommandSerializeFailed));
         }
+        link.wake_outgoing();
     }
     pub fn js_call_method<'a>(
         &'a self,

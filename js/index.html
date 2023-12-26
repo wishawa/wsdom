@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Document</title>
+	<script>
+		function startWebSocketWRMI(wsUrl, wsProtocols) {
+			const ws = new WebSocket(wsUrl, wsProtocols);
+			const wrmi = new WRMI(ws.send);
+			ws.onmessage = (msg) => {
+				wrmi.handleIncomingMessage(msg.data);
+			};
+		}
+		class WRMI {
+			constructor(sendMessage) {
+				this.internal = new WRMIInternal(sendMessage);
+			}
+			handleIncomingMessage(msg) {
+				const fn = new Function('_w', msg);
+				fn(this.internal);
+			}
+		}
+		class WRMIInternal {
+			constructor(sender) {
+				this.g = (id) => {
+					return this.values.get(id);
+				};
+				this.s = (id, value) => {
+					this.values.set(id, value);
+				};
+				this.d = (id) => {
+					this.values.delete(id);
+				};
+				this.r = (id) => {
+					const valJson = JSON.stringify(this.g(id));
+					(this.sender)(`${id}:${valJson}`);
+				};
+				this.sender = sender;
+				this.values = new Map();
+			}
+		}
+		startWebSocketWRMI("ws://localhost:3000/ws");
+	</script>
+</head>
+
+<body>
+
+</body>
+
+</html>

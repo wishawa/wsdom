@@ -1,8 +1,7 @@
-use std::cell::RefCell;
 use std::marker::PhantomData;
+use std::sync::Mutex;
 use std::{fmt::Write, future::Future, pin::Pin, task::Poll};
 
-use parking_lot::ReentrantMutex;
 use serde::de::DeserializeOwned;
 
 use crate::link::WrmiLink;
@@ -11,12 +10,12 @@ use crate::protocol::{GET, REP};
 pub struct RetrieveFuture<'a, T: DeserializeOwned> {
     pub(crate) id: u64,
     pub(crate) ret_id: Option<u64>,
-    pub(crate) link: &'a ReentrantMutex<RefCell<WrmiLink>>,
+    pub(crate) link: &'a Mutex<WrmiLink>,
     _phantom: PhantomData<Pin<Box<T>>>,
 }
 
 impl<'a, T: DeserializeOwned> RetrieveFuture<'a, T> {
-    pub(crate) fn new(id: u64, link: &'a ReentrantMutex<RefCell<WrmiLink>>) -> Self {
+    pub(crate) fn new(id: u64, link: &'a Mutex<WrmiLink>) -> Self {
         Self {
             id,
             ret_id: None,
@@ -30,8 +29,7 @@ impl<'a, T: DeserializeOwned> Future for RetrieveFuture<'a, T> {
     type Output = T;
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-        let link = this.link.lock();
-        let mut link = link.borrow_mut();
+        let mut link = this.link.lock().unwrap();
         if let Some(ret_id) = this.ret_id {
             if let Some(v) = link.retrieve_values.remove(&ret_id) {
                 let v = v.split_once(':').unwrap().1;
@@ -45,6 +43,7 @@ impl<'a, T: DeserializeOwned> Future for RetrieveFuture<'a, T> {
             this.ret_id = Some(ret_id);
             let this_id = this.id;
             write!(link.raw_commands_buf(), "{REP}({ret_id},{GET}({this_id}));").unwrap();
+            link.wake_outgoing();
         }
         let waker = cx.waker();
         match link.retrieve_wakers.entry(this.id) {

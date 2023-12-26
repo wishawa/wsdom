@@ -9,5 +9,6 @@ edition = "2021"
 wrmi-macros = { path = "../wrmi-macros/" }
 wrmi-core = { path = "../wrmi-core/" }
 wrmi-javascript = { path = "../wrmi-javascript/" }
+wrmi-dom = { path = "../wrmi-dom/" }
 ref-cast = "1"
 serde = { version = "1" }

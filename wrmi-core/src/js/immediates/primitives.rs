@@ -1,4 +1,4 @@
-use crate::{js::primitives::*, serialize::SerdeToJs, ToJs, UseInJsCode};
+use crate::{js::primitives::*, js::value::JsValue, serialize::SerdeToJs, ToJs, UseInJsCode};
 
 macro_rules! impl_use_in_js {
     ($name:ident) => {
@@ -7,6 +7,7 @@ macro_rules! impl_use_in_js {
                 SerdeToJs(self).serialize_to(buf)
             }
         }
+        impl ToJs<JsValue> for $name {}
     };
 }
 
@@ -19,6 +20,8 @@ impl<'a> UseInJsCode for &'a str {
         SerdeToJs(self).serialize_to(buf)
     }
 }
+impl<'a> ToJs<JsString> for &'a str {}
+impl<'a> ToJs<JsValue> for &'a str {}
 
 impl ToJs<JsNumber> for i8 {}
 impl ToJs<JsNumber> for i16 {}
