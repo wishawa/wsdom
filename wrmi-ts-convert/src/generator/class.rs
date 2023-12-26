@@ -2,13 +2,15 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::{
-    generator::util::{iter_dedupe_all, iter_dedupe_consecutive},
+    generator::{
+        types::SimplifiedType,
+        util::{iter_dedupe_all, iter_dedupe_consecutive},
+    },
     parser::{
         comment::WithComment,
         field::{Field, FieldName},
         interface::Interface,
         member::Member,
-        ts_type::{NamedType, TsType},
     },
 };
 
@@ -19,15 +21,6 @@ use super::{
 };
 
 impl<'a> Context<'a> {
-    fn get_all_ancestors<'s: 'o, 'o>(&'s self, name: &str, out: &mut Vec<&'o NamedType<'o>>) {
-        let ancs = match self.inhr_tree.get(name) {
-            Some(x) => x,
-            _ => return,
-        };
-        out.extend(ancs.iter());
-        ancs.iter()
-            .for_each(|anc| self.get_all_ancestors(anc.name, out));
-    }
     pub(super) fn make_class(
         &self,
         interface: &Interface<'_>,
@@ -45,29 +38,29 @@ impl<'a> Context<'a> {
         } else {
             let with_bounds_with_defaults = interface.generics.args.iter().map(|arg| {
                 let name = new_ident_safe(arg.name);
-                let mut extends = Vec::new();
-                self.get_all_ancestors(arg.name, &mut extends);
-                let extends = extends.iter().clone().map(|t| {
-                    let t = self.convert_type(TsType::Named {
-                        ty: (*t).to_owned(),
-                    });
-                    quote! {
-                        + ::core::convert::AsRef<#t>
-                    }
-                });
-                let extends_cloned = extends.clone();
+                let bounds = arg
+                    .extends
+                    .clone()
+                    .map(|t| {
+                        let t = self.convert_type(self.simplify_type(t));
+                        quote! {
+                            ::core::convert::AsRef<#t> + ::core::convert::Into<#t>
+                        }
+                    })
+                    .into_iter();
+                let bounds_cloned = bounds.clone();
                 let default = arg.default.clone().map(|t| {
-                    let t = self.convert_type(t);
+                    let t = self.convert_type(self.simplify_type(t));
                     quote! {
                         = #t
                     }
                 });
                 (
                     quote! {
-                        #name: __wrmi_load_ts_macro::JsCast #(+ #extends)*
+                        #name: __wrmi_load_ts_macro::JsCast #(+ #bounds)*
                     },
                     quote! {
-                        #name: __wrmi_load_ts_macro::JsCast #(+ #extends_cloned)* #default
+                        #name: __wrmi_load_ts_macro::JsCast #(+ #bounds_cloned)* #default
                     },
                 )
             });
@@ -96,42 +89,31 @@ impl<'a> Context<'a> {
 
         let mut ancestors = Vec::new();
 
-        static ALWAYS_EXTENDED: &[TsType<'static>] = &[known_types::UNKNOWN, known_types::OBJECT];
+        static ALWAYS_EXTENDED: &[SimplifiedType] = &[known_types::UNKNOWN, known_types::OBJECT];
         interface
             .extends
             .iter()
-            .chain(ALWAYS_EXTENDED.iter())
-            .for_each(|ty| match ty {
-                TsType::Named {
-                    ty: ty @ NamedType { name, .. },
-                } => {
-                    self.get_all_ancestors(name, &mut ancestors);
-                    ancestors.push(ty);
-                }
-                _ => {}
+            .map(|ty| self.simplify_type(ty.to_owned()))
+            .chain(ALWAYS_EXTENDED.iter().cloned())
+            .for_each(|ty| {
+                self.visit_all_ancestors(&ty, &mut |ext| {
+                    ancestors.push(ext.to_owned());
+                    None::<()>
+                });
+                ancestors.push(ty);
             });
         ancestors.sort_by_key(|item| item.name);
         ancestors.dedup_by_key(|item| item.name);
 
-        let extends = ancestors
-            .iter()
-            .map(|anc| TsType::Named {
-                ty: (*anc).to_owned(),
-            })
-            .map(|iface| self.convert_type(iface.to_owned()));
-        // let extends = interface
-        //     .extends
-        //     .iter()
-        //     .map(ToOwned::to_owned)
-        //     .chain([known_types::UNKNOWN, known_types::OBJECT].into_iter())
-        //     .map(|iface| self.convert_type(iface.to_owned()));
         let first_extend = self.convert_type(
             interface
                 .extends
                 .first()
-                .unwrap_or(&known_types::OBJECT)
-                .to_owned(),
+                .map(|ty| self.simplify_type(ty.to_owned()))
+                .unwrap_or(known_types::OBJECT),
         );
+
+        let extends = ancestors.into_iter().map(|anc| self.convert_type(anc));
 
         let tokens = quote! {
             #tokens
@@ -175,8 +157,6 @@ impl<'a> Context<'a> {
                     self.as_ref()
                 }
             }
-
-            // impl #generics_with_bound __wrmi_load_ts_macro::ToJs< #name #generics_with_bound > for #name #generics_with_bound {}
         };
 
         let tokens = {
@@ -233,16 +213,16 @@ impl<'a> Context<'a> {
                 let arg_names_sig = method.args.iter().map(|arg| new_ident_safe(arg.name));
                 let arg_names_body = arg_names_sig.clone();
                 let arg_types = method.args.iter().map(|arg| {
-                    let arg_type = self.convert_type(arg.ty.to_owned());
+                    let arg_type = self.convert_type(self.simplify_type(arg.ty.to_owned()));
                     quote! {&impl __wrmi_load_ts_macro::ToJs<#arg_type>}
                 });
                 let last_arg_variadic = method.args.iter().any(|arg| arg.variadic);
-                let ret = self.convert_type(method.ret.to_owned());
+                let ret = self.convert_type(self.simplify_type(method.ret.to_owned()));
                 let method_generics = method.generics.args.iter().map(|gen| {
                     let name = new_ident_safe(gen.name);
-                    let extends = gen.extends.clone().map(|ty| self.convert_type(ty)).into_iter();
+                    let bounds = gen.extends.clone().map(|ty| self.convert_type(self.simplify_type(ty))).into_iter();
                     quote! {
-                        #name: __wrmi_load_ts_macro::JsCast #(+ ::core::convert::AsRef<#extends> + ::core::convert::Into<#extends>)*
+                        #name: __wrmi_load_ts_macro::JsCast #(+ ::core::convert::AsRef<#bounds> + ::core::convert::Into<#bounds>)*
                     }
                 });
                 let method_generics = if method.generics.args.is_empty() {
@@ -293,10 +273,11 @@ impl<'a> Context<'a> {
                     crate::parser::field::FieldName::Name(name) => *name,
                     crate::parser::field::FieldName::Wildcard { .. } => return None,
                 };
-                let mut ty = field.ty.to_owned();
+                let mut ty = self.simplify_type(field.ty.to_owned());
                 if field.optional {
-                    ty = TsType::Union {
-                        pair: Box::new((ty, known_types::NULL)),
+                    ty = SimplifiedType {
+                        name: "__translate_nullable",
+                        args: vec![ty],
                     };
                 }
                 let ty = self.convert_type(ty);
@@ -350,7 +331,7 @@ impl<'a> Context<'a> {
                 let field_name_str = getter.name;
                 let getter_name_ident =
                     new_ident_safe(&format!("get_{}", to_snake_case(field_name_str)));
-                let ret = self.convert_type(getter.ret.to_owned());
+                let ret = self.convert_type(self.simplify_type(getter.ret.to_owned()));
                 Some(quote! {
                     pub fn #getter_name_ident (&self) -> #ret {
                         __wrmi_load_ts_macro::JsCast::unchecked_from_js(
@@ -366,7 +347,7 @@ impl<'a> Context<'a> {
                 let field_name_str = setter.name;
                 let setter_name_ident =
                     new_ident_safe(&format!("set_{}", to_snake_case(field_name_str)));
-                let ty = self.convert_type(setter.arg_ty.to_owned());
+                let ty = self.convert_type(self.simplify_type(setter.arg_ty.to_owned()));
                 Some(quote! {
                     pub fn #setter_name_ident (&self, value: #ty) {
                         __wrmi_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, &value)

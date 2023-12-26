@@ -8,7 +8,7 @@ use super::{util::new_ident_safe, Context};
 impl<'a> Context<'a> {
     pub(super) fn make_type_alias(&self, ta: &TypeAlias<'a>) -> TokenStream {
         let name = new_ident_safe(ta.name);
-        let ty = self.convert_type(ta.ty.to_owned());
+        let ty = self.convert_type(self.simplify_type(ta.ty.to_owned()));
         if ta.generics.args.is_empty() {
             quote! {
                 type #name = #ty;
@@ -16,8 +16,8 @@ impl<'a> Context<'a> {
         } else {
             let generic_args = ta.generics.args.iter().map(|arg| {
                 let name = new_ident_safe(arg.name);
-                let extends = arg.extends.clone().map(|b| {
-                    let t = self.convert_type(b);
+                let extends = arg.extends.clone().map(|arg| {
+                    let t = self.convert_type(self.simplify_type(arg));
                     quote! {
                         : ::core::convert::AsRef<#t> + ::core::convert::Into<#t>
                     }

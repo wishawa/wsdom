@@ -8,7 +8,7 @@ use super::Context;
 impl<'a> Context<'a> {
     pub(super) fn make_global_var_getter(&self, name: &str, ty: &TsType<'a>) -> TokenStream {
         let function_name = new_ident_safe(name);
-        let ty = self.convert_type(ty.to_owned());
+        let ty = self.convert_type(self.simplify_type(ty.to_owned()));
         quote! {
             pub fn #function_name (browser: &__wrmi_load_ts_macro::Browser) -> #ty {
                 __wrmi_load_ts_macro::JsCast::unchecked_from_js(

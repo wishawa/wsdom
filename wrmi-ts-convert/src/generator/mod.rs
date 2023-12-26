@@ -29,50 +29,37 @@ use crate::{
 
 #[derive(Default)]
 struct Context<'a> {
-    types: HashMap<&'a str, Interface<'a>>,
-    inhr_tree: HashMap<&'a str, Vec<NamedType<'a>>>,
-    aliases: HashMap<&'a str, (GenericsDeclaration<'a>, TsType<'a>)>,
-    declare_globals: HashMap<&'a str, &'a TsType<'a>>,
+    interfaces: HashMap<&'a str, Interface<'a>>,
+    inhr_graph: HashMap<&'a str, (GenericsDeclaration<'a>, Vec<NamedType<'a>>)>,
 }
 
 pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream {
     let mut generated_code = Vec::<TokenStream>::new();
     let mut types = HashMap::new();
-    let mut aliases = HashMap::new();
-    let mut declare_globals = HashMap::new();
-    let mut inhr_tree = HashMap::<_, Vec<_>>::new();
+    let mut inhr_graph = HashMap::new();
     for item in dts {
         match &item.data {
             Item::Interface(interface) => {
                 let interface = interface.clone();
+                let (_, extends) = inhr_graph
+                    .entry(interface.name)
+                    .or_insert_with(|| (interface.generics.clone(), Vec::new()));
                 for extend in &interface.extends {
                     match extend {
                         TsType::Named { ty } => {
-                            inhr_tree
-                                .entry(interface.name)
-                                .or_default()
-                                .push(ty.clone());
+                            extends.push(ty.to_owned());
                         }
                         _ => {}
                     }
                 }
                 types.insert(interface.name, interface);
             }
-            Item::TypeAlias(alias) => {
-                let alias = alias.clone();
-                aliases.insert(alias.name, (alias.generics, alias.ty));
-            }
-            Item::DeclareVar(DeclareVar { name, ty }) => {
-                declare_globals.insert(*name, ty);
-            }
             _ => {}
         }
     }
     let ctx = Context {
-        types,
-        aliases,
-        declare_globals,
-        inhr_tree,
+        interfaces: types,
+        inhr_graph,
     };
     let mut classes_made = HashSet::new();
     for dv in dts.iter().filter_map(|item| match &item.data {
@@ -90,7 +77,7 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
                 TsType::Named {
                     ty: NamedType { name, .. },
                 } => ctx
-                    .types
+                    .interfaces
                     .get(name)
                     .map(|interface| (&*interface.members, false)),
                 TsType::Interface { members } => Some((&**members, true)),
@@ -114,8 +101,8 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
                 continue;
             }
             let iface = constructor_ty
-                .and_then(|s| ctx.types.get(s))
-                .or_else(|| direct_decl.then(|| ctx.types.get(name)).flatten())
+                .and_then(|s| ctx.interfaces.get(s))
+                .or_else(|| direct_decl.then(|| ctx.interfaces.get(name)).flatten())
                 .map(Cow::Borrowed)
                 .unwrap_or_else(|| {
                     Cow::Owned(Interface {

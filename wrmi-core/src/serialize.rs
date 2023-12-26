@@ -1,7 +1,6 @@
 use serde::Serialize;
 
 use crate::js::value::JsValue;
-use crate::js_cast::JsCast;
 use crate::protocol::GET;
 
 /// For values that can be serialized to JS code:

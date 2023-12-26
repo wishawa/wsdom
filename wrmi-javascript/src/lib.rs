@@ -3,7 +3,6 @@
 pub use wrmi_macros::load_ts;
 
 mod __wrmi_load_ts_macro {
-    pub use super::Array;
     pub use ref_cast::RefCast;
     pub use wrmi_core::{js_types::*, Browser, JsCast, ToJs, UseInJsCode};
 }

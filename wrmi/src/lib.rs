@@ -38,12 +38,18 @@ mod tests {
     fn unify_nullable() {
         use super::__wrmi_load_ts_macro;
         use wrmi_javascript::*;
-        wrmi_macros::load_ts!("../data-test/unify_null.d.ts");
+        wrmi_macros::load_ts!("../data-test/unify-null.d.ts");
     }
 
     #[test]
     fn generic() {
         use super::__wrmi_load_ts_macro;
         wrmi_macros::load_ts!("../data-test/generic.d.ts");
+    }
+
+    #[test]
+    fn unify() {
+        use super::__wrmi_load_ts_macro;
+        wrmi_macros::load_ts!("../data-test/unify.d.ts");
     }
 }

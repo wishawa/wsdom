@@ -44,7 +44,7 @@ pub(crate) enum TsType<'a> {
         types: Vec<TsType<'a>>,
     },
     ObjectIndex {
-        obj_index: Box<(TsType<'a>, TsType<'a>)>,
+        obj_index: Box<(TsType<'a>, Expr<'a>)>,
     },
     Interface {
         members: Vec<WithComment<'a, Member<'a>>>,
@@ -118,7 +118,7 @@ impl<'a> TsType<'a> {
 
         // array and index
         while let Ok(bracket) =
-            delimited(token('['), opt(TsType::parse), token(']')).parse_next(input)
+            delimited(token('['), opt(Expr::parse), token(']')).parse_next(input)
         {
             res = match bracket {
                 Some(item) => TsType::ObjectIndex {
