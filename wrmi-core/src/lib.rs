@@ -9,6 +9,7 @@ mod serialize;
 pub use link::{Browser, WrmiLink};
 pub mod js_types {
     pub use super::js::{
+        immediates::NullImmediate,
         nullable::{JsNullable, JsNullish},
         object::JsObject,
         primitives::*,

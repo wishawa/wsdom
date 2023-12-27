@@ -6,6 +6,7 @@ use axum::{
     routing::get,
     Router,
 };
+use wrmi::js_types::{JsValue, NullImmediate};
 
 #[tokio::main]
 async fn main() {
@@ -29,11 +30,19 @@ async fn handle_socket(mut socket: WebSocket) {
             let document = wrmi::dom::document(&browser);
             let body = document.get_body();
             body.set_inner_text(&"connected!");
-            for i in 0..20 {
+            for i in 0..5 {
                 tokio::time::sleep(Duration::from_secs(1)).await;
+                let elem = document.create_element(&"div", &NullImmediate);
+                elem.set_inner_text(&&*format!("div: {i}"));
                 let txt = document.create_text_node(&&*format!("{i}"));
                 body.append_child(&txt);
+                body.append_child(&elem);
             }
+            wrmi::dom::alert(&browser, &"done");
+            wrmi::dom::alert(
+                &browser,
+                &Into::<JsValue>::into(wrmi::js::Math::exp(&browser, &2.0)),
+            );
         }
     });
     loop {

@@ -6,9 +6,15 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Document</title>
 	<script>
+		"use strict";
 		function startWebSocketWRMI(wsUrl, wsProtocols) {
 			const ws = new WebSocket(wsUrl, wsProtocols);
 			const wrmi = new WRMI(ws.send);
+			ws.onopen = () => {
+				console.debug("WRMI WS connection open!");
+				console.debug("WebSocket object", ws);
+				console.debug("WRMI object", wrmi);
+			};
 			ws.onmessage = (msg) => {
 				wrmi.handleIncomingMessage(msg.data);
 			};

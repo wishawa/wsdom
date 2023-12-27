@@ -5,6 +5,11 @@ type SendMessage = (msg: string) => void;
 function startWebSocketWRMI(wsUrl: string | URL, wsProtocols?: string | string[]) {
 	const ws = new WebSocket(wsUrl, wsProtocols);
 	const wrmi = new WRMI(ws.send);
+	ws.onopen = () => {
+		console.debug("WRMI WS connection open!");
+		console.debug("WebSocket object", ws);
+		console.debug("WRMI object", wrmi);
+	}
 	ws.onmessage = (msg: MessageEvent<string>) => {
 		wrmi.handleIncomingMessage(msg.data);
 	};

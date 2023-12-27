@@ -32,23 +32,25 @@ pub fn new_ident_safe(name: &str) -> Ident {
 
 pub fn iter_dedupe_consecutive<I: Iterator, K: Eq>(
     iter: I,
-    key: impl FnMut(&I::Item) -> Option<K>,
+    key: impl FnMut(&I::Item) -> K,
 ) -> impl Iterator<Item = I::Item> {
     struct Iter<I: Iterator, C> {
         key: C,
         inside: std::iter::Peekable<I>,
     }
-    impl<I: Iterator, K: Eq, C: FnMut(&I::Item) -> Option<K>> Iterator for Iter<I, C> {
+    impl<I: Iterator, K: Eq, C: FnMut(&I::Item) -> K> Iterator for Iter<I, C> {
         type Item = I::Item;
 
         fn next(&mut self) -> Option<Self::Item> {
             loop {
                 let item = self.inside.next()?;
                 let item_key = (self.key)(&item);
-                let next_key = self.inside.peek().and_then(|next| (self.key)(next));
-                match (item_key, next_key) {
-                    (Some(x1), Some(x2)) if x1 == x2 => continue,
-                    _ => return Some(item),
+                let next_dup = self
+                    .inside
+                    .peek()
+                    .is_some_and(|next| (self.key)(next) == item_key);
+                if !next_dup {
+                    return Some(item);
                 }
             }
         }
@@ -61,21 +63,21 @@ pub fn iter_dedupe_consecutive<I: Iterator, K: Eq>(
 
 pub fn iter_dedupe_all<I: Iterator, K: Eq + Hash>(
     iter: I,
-    key: impl FnMut(&I::Item) -> Option<K>,
+    key: impl FnMut(&I::Item) -> K,
 ) -> impl Iterator<Item = I::Item> {
-    struct Iter<I: Iterator, K: Eq + Hash, C: FnMut(&I::Item) -> Option<K>> {
+    struct Iter<I: Iterator, K: Eq + Hash, C: FnMut(&I::Item) -> K> {
         visited: HashSet<K>,
         key: C,
         inside: I,
     }
-    impl<I: Iterator, K: Eq + Hash, C: FnMut(&I::Item) -> Option<K>> Iterator for Iter<I, K, C> {
+    impl<I: Iterator, K: Eq + Hash, C: FnMut(&I::Item) -> K> Iterator for Iter<I, K, C> {
         type Item = I::Item;
 
         fn next(&mut self) -> Option<Self::Item> {
             loop {
                 let item = self.inside.next()?;
                 let key = (self.key)(&item);
-                if key.is_some_and(|k| !self.visited.insert(k)) {
+                if !self.visited.insert(key) {
                     continue;
                 }
                 return Some(item);

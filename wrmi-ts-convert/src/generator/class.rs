@@ -10,7 +10,8 @@ use crate::{
         comment::WithComment,
         field::{Field, FieldName},
         interface::Interface,
-        member::Member,
+        member::{Getter, Member, Setter},
+        method::{Method, MethodName},
     },
 };
 
@@ -160,148 +161,217 @@ impl<'a> Context<'a> {
         };
 
         let tokens = {
-            let member_code = iter_dedupe_all(
-                iter_dedupe_consecutive(
-                    decl_members
-                        .iter()
-                        .map(|member| (member, false))
-                        .chain(interface.members.iter().map(|member| (member, true))),
-                    |(member, _)| match &member.data {
-                        Member::Method(m) => Some(&m.name),
-                        _ => None,
-                    },
-                ),
-                |(member, _)| match &member.data {
-                    Member::Field(Field {
-                        name: FieldName::Name(name),
-                        ..
-                    }) => Some(*name),
-                    _ => None,
-                },
-            )
-            .filter_map(|(member, on_instance)| {
-                self.make_member_code(interface.name, &member.data, on_instance)
-            });
+            let mut member_tokens = Vec::new();
+            let all_members = decl_members
+                .iter()
+                .map(|member| (member, false))
+                .chain(interface.members.iter().map(|member| (member, true)));
 
+            let methods =
+                all_members
+                    .clone()
+                    .filter_map(|(member, on_instance)| match &member.data {
+                        Member::Method(x) => Some((x, on_instance)),
+                        _ => None,
+                    });
+            let fields =
+                all_members
+                    .clone()
+                    .filter_map(|(member, on_instance)| match &member.data {
+                        Member::Field(x) => Some((x, on_instance)),
+                        _ => None,
+                    });
+            let getters =
+                all_members
+                    .clone()
+                    .filter_map(|(member, on_instance)| match &member.data {
+                        Member::Getter(x) => Some((x, on_instance)),
+                        _ => None,
+                    });
+            let setters =
+                all_members
+                    .clone()
+                    .filter_map(|(member, on_instance)| match &member.data {
+                        Member::Setter(x) => Some((x, on_instance)),
+                        _ => None,
+                    });
+            {
+                let methods = iter_dedupe_consecutive(methods, |(m, _)| (&m.name, m.args.len()));
+
+                let mut last_method_name = MethodName::Name("");
+                for (method, on_instance) in methods {
+                    let is_overload = method.name == last_method_name;
+                    last_method_name = method.name.clone();
+                    member_tokens.push(self.make_method_code(
+                        interface.name,
+                        method,
+                        on_instance,
+                        is_overload,
+                    ));
+                }
+            }
+            {
+                let fields = iter_dedupe_all(fields, |(f, _)| match &f.name {
+                    FieldName::Name(s) => *s,
+                    FieldName::Wildcard { .. } => "[]",
+                });
+                for (field, on_instance) in fields {
+                    member_tokens.push(self.make_field_code(interface.name, field, on_instance));
+                }
+            }
+            {
+                for (getter, on_instance) in getters {
+                    member_tokens.push(self.make_getter_code(interface.name, getter, on_instance));
+                }
+            }
+            {
+                for (setter, on_instance) in setters {
+                    member_tokens.push(self.make_setter_code(interface.name, setter, on_instance));
+                }
+            }
             quote! {
                 #tokens
                 impl #generics_with_bound #name #generics_without_bound {
-                    #(#member_code)*
+                    #(
+                        #member_tokens
+                    )*
                 }
             }
         };
 
         tokens
     }
-    fn make_member_code(
+    fn make_method_code(
         &self,
         interface_name: &'_ str,
-        member: &Member<'_>,
+        method: &Method<'_>,
         on_instance: bool,
+        is_overload: bool,
     ) -> Option<TokenStream> {
-        match member {
-            Member::Method(method) => {
-                let is_constructor = !on_instance
-                    && matches!(method.name, crate::parser::method::MethodName::Constructor);
-                let method_name_str = match method.name {
-                    crate::parser::method::MethodName::Nothing => "call_self",
-                    crate::parser::method::MethodName::Constructor => "new",
-                    crate::parser::method::MethodName::Iterator => return None,
-                    crate::parser::method::MethodName::Name(name) => name,
-                };
-                let method_name_ident = new_ident_safe(&to_snake_case(method_name_str));
-                let arg_names_sig = method.args.iter().map(|arg| new_ident_safe(arg.name));
-                let arg_names_body = arg_names_sig.clone();
-                let arg_types = method.args.iter().map(|arg| {
-                    let arg_type = self.convert_type(self.simplify_type(arg.ty.to_owned()));
-                    quote! {&impl __wrmi_load_ts_macro::ToJs<#arg_type>}
-                });
-                let last_arg_variadic = method.args.iter().any(|arg| arg.variadic);
-                let ret = self.convert_type(self.simplify_type(method.ret.to_owned()));
-                let method_generics = method.generics.args.iter().map(|gen| {
+        let is_constructor =
+            !on_instance && matches!(method.name, crate::parser::method::MethodName::Constructor);
+        let method_name_str = match method.name {
+            crate::parser::method::MethodName::Nothing => "call_self",
+            crate::parser::method::MethodName::Constructor => "new",
+            crate::parser::method::MethodName::Iterator => return None,
+            crate::parser::method::MethodName::Name(name) => name,
+        };
+        let mut rust_name_str = to_snake_case(method_name_str);
+
+        if is_overload {
+            rust_name_str.push_str("_with");
+            for arg in &method.args {
+                rust_name_str.push('_');
+                rust_name_str.push_str(arg.name);
+            }
+        }
+        let method_name_ident = new_ident_safe(&rust_name_str);
+        let arg_names_sig = method.args.iter().map(|arg| new_ident_safe(arg.name));
+        let arg_names_body = arg_names_sig.clone();
+        let arg_types = method.args.iter().map(|arg| {
+            let ty = self.simplify_type(arg.ty.to_owned());
+            let ty = if arg.optional {
+                SimplifiedType {
+                    name: "__translate_nullable",
+                    args: vec![ty],
+                }
+            } else {
+                ty
+            };
+            let arg_type = self.convert_type(ty);
+            quote! {&impl __wrmi_load_ts_macro::ToJs<#arg_type>}
+        });
+        let last_arg_variadic = method.args.iter().any(|arg| arg.variadic);
+        let ret = self.convert_type(self.simplify_type(method.ret.to_owned()));
+        let method_generics = method.generics.args.iter().map(|gen| {
                     let name = new_ident_safe(gen.name);
                     let bounds = gen.extends.clone().map(|ty| self.convert_type(self.simplify_type(ty))).into_iter();
                     quote! {
                         #name: __wrmi_load_ts_macro::JsCast #(+ ::core::convert::AsRef<#bounds> + ::core::convert::Into<#bounds>)*
                     }
                 });
-                let method_generics = if method.generics.args.is_empty() {
-                    None
-                } else {
-                    Some(quote! {
-                        <#(#method_generics,)*>
-                    })
-                };
-                if on_instance {
-                    Some(quote! {
-                        pub fn #method_name_ident #method_generics (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {
-                            __wrmi_load_ts_macro::JsCast::unchecked_from_js(
-                                __wrmi_load_ts_macro::JsObject::js_call_method(self.as_ref(), #method_name_str, [
-                                    #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode, )*
-                                ], #last_arg_variadic)
-                            )
-                        }
-                    })
-                } else {
-                    if is_constructor {
-                        Some(quote! {
-                            pub fn #method_name_ident (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
-                                __wrmi_load_ts_macro::JsCast::unchecked_from_js(
-                                    browser.call_constructor(#interface_name, [
-                                        #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
-                                    ], #last_arg_variadic)
-                                )
-                            }
-                        })
-                    } else {
-                        let function = format!("{}.{}", interface_name, method_name_str);
-                        Some(quote! {
-                            pub fn #method_name_ident #method_generics (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
-                                __wrmi_load_ts_macro::JsCast::unchecked_from_js(
-                                    browser.call_function(#function, [
-                                        #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
-                                    ], #last_arg_variadic)
-                                )
-                            }
-                        })
+        let method_generics = if method.generics.args.is_empty() {
+            None
+        } else {
+            Some(quote! {
+                <#(#method_generics,)*>
+            })
+        };
+        if on_instance {
+            Some(quote! {
+                pub fn #method_name_ident #method_generics (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {
+                    __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                        __wrmi_load_ts_macro::JsObject::js_call_method(self.as_ref(), #method_name_str, [
+                            #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode, )*
+                        ], #last_arg_variadic)
+                    )
+                }
+            })
+        } else {
+            if is_constructor {
+                Some(quote! {
+                    pub fn #method_name_ident (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
+                        __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                            browser.call_constructor(#interface_name, [
+                                #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
+                            ], #last_arg_variadic)
+                        )
+                    }
+                })
+            } else {
+                let function = format!("{}.{}", interface_name, method_name_str);
+                Some(quote! {
+                    pub fn #method_name_ident #method_generics (browser: &__wrmi_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
+                        __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                            browser.call_function(#function, [
+                                #( #arg_names_body as &dyn __wrmi_load_ts_macro::UseInJsCode,)*
+                            ], #last_arg_variadic)
+                        )
+                    }
+                })
+            }
+        }
+    }
+    fn make_field_code(
+        &self,
+        interface_name: &'_ str,
+        field: &Field<'_>,
+        on_instance: bool,
+    ) -> Option<TokenStream> {
+        let field_name_str = match &field.name {
+            crate::parser::field::FieldName::Name(name) => *name,
+            crate::parser::field::FieldName::Wildcard { .. } => return None,
+        };
+        let mut ty = self.simplify_type(field.ty.to_owned());
+        if field.optional {
+            ty = SimplifiedType {
+                name: "__translate_nullable",
+                args: vec![ty],
+            };
+        }
+        let ty = self.convert_type(ty);
+        let field_name_snake_case = to_snake_case(field_name_str);
+        let getter = {
+            let getter_name_ident = new_ident_safe(&format!("get_{field_name_snake_case}"));
+            if on_instance {
+                quote! {
+                    pub fn #getter_name_ident (&self) -> #ty {
+                        __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                            __wrmi_load_ts_macro::JsObject::js_get_field(self.as_ref(), &#field_name_str)
+                        )
+                    }
+                }
+            } else {
+                quote! {
+                    pub fn #getter_name_ident (browser: &__wrmi_load_ts_macro::Browser) -> #ty {
+                        __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                            browser.get_field(&__wrmi_load_ts_macro::RawCodeImmediate(#interface_name), &#field_name_str)
+                        )
                     }
                 }
             }
-            Member::Field(field) => {
-                let field_name_str = match &field.name {
-                    crate::parser::field::FieldName::Name(name) => *name,
-                    crate::parser::field::FieldName::Wildcard { .. } => return None,
-                };
-                let mut ty = self.simplify_type(field.ty.to_owned());
-                if field.optional {
-                    ty = SimplifiedType {
-                        name: "__translate_nullable",
-                        args: vec![ty],
-                    };
-                }
-                let ty = self.convert_type(ty);
-                let field_name_snake_case = to_snake_case(field_name_str);
-                let getter = {
-                    let getter_name_ident = new_ident_safe(&format!("get_{field_name_snake_case}"));
-                    if on_instance {
-                        quote! {
-                            pub fn #getter_name_ident (&self) -> #ty {
-                                __wrmi_load_ts_macro::JsCast::unchecked_from_js(
-                                    __wrmi_load_ts_macro::JsObject::js_get_field(self.as_ref(), &#field_name_str)
-                                )
-                            }
-                        }
-                    } else {
-                        quote! {
-                            pub fn #getter_name_ident (browser: &__wrmi_load_ts_macro::Browser) -> #ty {
-                                __wrmi_load_ts_macro::JsCast::unchecked_from_js(
-                                    browser.get_field(&__wrmi_load_ts_macro::RawCodeImmediate(#interface_name), &#field_name_str)
-                                )
-                            }
-                        }
-                    }
-                };
-                let setter = (!field.readonly).then(|| {
+        };
+        let setter = (!field.readonly).then(|| {
                     let setter_name_ident = new_ident_safe(&format!("set_{field_name_snake_case}"));
                     if on_instance {
                         quote!{
@@ -318,41 +388,47 @@ impl<'a> Context<'a> {
                         }
                     }
                 });
-                Some(quote! {
-                    #getter
-                    #setter
-                })
-            }
-            Member::Getter(getter) => {
-                if !on_instance {
-                    todo!("getter {} on constructor {}", getter.name, interface_name);
-                }
-                let field_name_str = getter.name;
-                let getter_name_ident =
-                    new_ident_safe(&format!("get_{}", to_snake_case(field_name_str)));
-                let ret = self.convert_type(self.simplify_type(getter.ret.to_owned()));
-                Some(quote! {
-                    pub fn #getter_name_ident (&self) -> #ret {
-                        __wrmi_load_ts_macro::JsCast::unchecked_from_js(
-                            __wrmi_load_ts_macro::JsObject::js_get_field(self.as_ref(), &#field_name_str)
-                        )
-                    }
-                })
-            }
-            Member::Setter(setter) => {
-                if !on_instance {
-                    todo!("setter {} on constructor {}", setter.name, interface_name);
-                }
-                let field_name_str = setter.name;
-                let setter_name_ident =
-                    new_ident_safe(&format!("set_{}", to_snake_case(field_name_str)));
-                let ty = self.convert_type(self.simplify_type(setter.arg_ty.to_owned()));
-                Some(quote! {
-                    pub fn #setter_name_ident (&self, value: #ty) {
-                        __wrmi_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, &value)
-                    }
-                })
-            }
+        Some(quote! {
+            #getter
+            #setter
+        })
+    }
+    fn make_getter_code(
+        &self,
+        interface_name: &'_ str,
+        getter: &Getter<'_>,
+        on_instance: bool,
+    ) -> Option<TokenStream> {
+        if !on_instance {
+            todo!("getter {} on constructor {}", getter.name, interface_name);
         }
+        let field_name_str = getter.name;
+        let getter_name_ident = new_ident_safe(&format!("get_{}", to_snake_case(field_name_str)));
+        let ret = self.convert_type(self.simplify_type(getter.ret.to_owned()));
+        Some(quote! {
+            pub fn #getter_name_ident (&self) -> #ret {
+                __wrmi_load_ts_macro::JsCast::unchecked_from_js(
+                    __wrmi_load_ts_macro::JsObject::js_get_field(self.as_ref(), &#field_name_str)
+                )
+            }
+        })
+    }
+    fn make_setter_code(
+        &self,
+        interface_name: &'_ str,
+        setter: &Setter<'_>,
+        on_instance: bool,
+    ) -> Option<TokenStream> {
+        if !on_instance {
+            todo!("setter {} on constructor {}", setter.name, interface_name);
+        }
+        let field_name_str = setter.name;
+        let setter_name_ident = new_ident_safe(&format!("set_{}", to_snake_case(field_name_str)));
+        let ty = self.convert_type(self.simplify_type(setter.arg_ty.to_owned()));
+        Some(quote! {
+            pub fn #setter_name_ident (&self, value: #ty) {
+                __wrmi_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, &value)
+            }
+        })
     }
 }
