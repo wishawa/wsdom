@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use crate::UseInJsCode;
+use crate::serialize::UseInJsCode;
 
 impl<U> UseInJsCode for [U]
 where

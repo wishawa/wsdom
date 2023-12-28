@@ -34,9 +34,7 @@ async fn handle_socket(socket: WebSocket) {
             for i in 0..5 {
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 let elem = document.create_element(&"div", &NullImmediate);
-                elem.set_inner_text(&&*format!("div: {i}"));
-                let txt = document.create_text_node(&&*format!("{i}"));
-                body.append_child(&txt);
+                elem.set_inner_text(&&*format!("{i}"));
                 body.append_child(&elem);
             }
             let number = wsdom::js::Math::exp(&browser, &2.0);
@@ -68,28 +66,4 @@ async fn handle_socket(socket: WebSocket) {
         }
     };
     let _todo = tokio::join!(tx_fut, rx_fut);
-
-    // loop {
-    //     tokio::select! {
-    //         msg = socket.recv() => {
-    //             match msg {
-    //                 Some(Ok(Message::Text(txt))) => {
-    //                     browser.receive_incoming_message(txt);
-    //                 },
-    //                 _ => break
-    //             }
-    //         }
-    //         s = outgoing.next() => {
-    //             match s {
-    //                 Some(s) => {
-    //                     match socket.send(Message::Text(s)).await {
-    //                         Ok(_) => {}
-    //                         Err(_) => break
-    //                     }
-    //                 }
-    //                 _ => break
-    //             }
-    //         }
-    //     }
-    // }
 }

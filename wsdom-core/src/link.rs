@@ -12,11 +12,11 @@ use std::{
 ///
 /// Browser uses Arc internally, so cloning is cheap and a cloned Browser points to the same client.
 #[derive(Clone, Debug)]
-pub struct Browser(pub(crate) Arc<Mutex<WrmiLink>>);
+pub struct Browser(pub(crate) Arc<Mutex<BrowserInternal>>);
 
 impl Browser {
     pub fn new() -> Self {
-        let link = WrmiLink {
+        let link = BrowserInternal {
             retrieve_values: HashMap::new(),
             retrieve_wakers: HashMap::new(),
             last_id: 1,
@@ -37,7 +37,7 @@ impl Browser {
 }
 
 pub struct OutgoingMessages {
-    link: Arc<Mutex<WrmiLink>>,
+    link: Arc<Mutex<BrowserInternal>>,
 }
 
 impl futures_core::Stream for OutgoingMessages {
@@ -71,7 +71,7 @@ impl futures_core::Stream for OutgoingMessages {
 }
 
 #[derive(Debug)]
-pub struct WrmiLink {
+pub struct BrowserInternal {
     pub(crate) retrieve_wakers: HashMap<u64, Waker>,
     pub(crate) retrieve_values: HashMap<u64, String>,
     last_id: u64,
@@ -80,7 +80,7 @@ pub struct WrmiLink {
     dead: Option<Box<dyn Error + Send>>,
 }
 
-impl WrmiLink {
+impl BrowserInternal {
     pub fn receive(&mut self, message: String) {
         match message
             .split_once(':')

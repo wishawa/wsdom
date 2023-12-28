@@ -1,4 +1,8 @@
-use crate::{js::primitives::*, js::value::JsValue, serialize::SerdeToJs, ToJs, UseInJsCode};
+use crate::{
+    js::primitives::*,
+    js::value::JsValue,
+    serialize::{SerdeToJs, ToJs, UseInJsCode},
+};
 
 macro_rules! impl_use_in_js {
     ($name:ident) => {

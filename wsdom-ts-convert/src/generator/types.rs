@@ -137,15 +137,19 @@ impl<'a> Context<'a> {
                     .into_iter()
                     .map(|ty| self.simplify_type(ty))
                     .reduce(|acc, item| self.unify_types(acc, item))
-                    .unwrap_or(known_types::OBJECT)],
+                    .unwrap_or(known_types::UNKNOWN)],
             },
             TsType::PatternString { .. } => known_types::STRING,
             TsType::TsIs { .. } => known_types::BOOLEAN,
             TsType::KeyOf { .. } => known_types::STRING,
-            _ => known_types::OBJECT,
+            _ => known_types::UNKNOWN,
         }
     }
-    fn unify_types(&self, t1: SimplifiedType<'a>, t2: SimplifiedType<'a>) -> SimplifiedType<'a> {
+    pub(super) fn unify_types(
+        &self,
+        t1: SimplifiedType<'a>,
+        t2: SimplifiedType<'a>,
+    ) -> SimplifiedType<'a> {
         macro_rules! tuple_and_rev {
             ($a:pat, $b:pat) => {
                 ($a, $b) | ($b, $a)
@@ -200,7 +204,7 @@ impl<'a> Context<'a> {
                         ancs1.remove(anc.name).map(|got| (anc.to_owned(), got))
                     }) {
                         Some((from_1, from_2)) => self.unify_types(from_1, from_2),
-                        None => known_types::OBJECT,
+                        None => known_types::UNKNOWN,
                     }
                 }
             }

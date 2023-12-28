@@ -1,4 +1,4 @@
-use crate::{js::value::JsValue, js_cast::JsCast, UseInJsCode};
+use crate::{js::value::JsValue, js_cast::JsCast, serialize::UseInJsCode};
 
 include!("impl_basic.rs");
 

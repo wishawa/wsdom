@@ -1,6 +1,7 @@
 use crate::{
     js::nullable::{JsNullable, JsNullish},
-    JsCast, RawCodeImmediate, ToJs, UseInJsCode,
+    js_cast::JsCast,
+    serialize::{RawCodeImmediate, ToJs, UseInJsCode},
 };
 
 pub struct NullImmediate;

@@ -1,9 +1,9 @@
 [workspace]
 members = [
-	"wsdom/",
 	"wsdom-core/",
 	"wsdom-macros/",
 	"wsdom-ts-convert/",
+	"wsdom/",
 	"wsdom-javascript/",
 	"wsdom-dom/",
 	"examples/simple/"

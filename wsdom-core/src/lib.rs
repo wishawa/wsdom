@@ -1,3 +1,4 @@
+mod interaction;
 mod js;
 mod js_cast;
 mod link;
@@ -6,7 +7,7 @@ mod protocol;
 mod retrieve;
 mod serialize;
 
-pub use link::{Browser, WrmiLink};
+pub use link::{Browser, BrowserInternal};
 pub mod js_types {
     pub use super::js::{
         immediates::NullImmediate,
@@ -15,7 +16,6 @@ pub mod js_types {
         primitives::*,
         value::JsValue,
     };
-    pub use super::serialize::RawCodeImmediate;
 }
 pub use js_cast::JsCast;
 pub use serialize::{RawCodeImmediate, ToJs, UseInJsCode};

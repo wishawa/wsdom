@@ -4,18 +4,18 @@ use std::{fmt::Write, future::Future, pin::Pin, task::Poll};
 
 use serde::de::DeserializeOwned;
 
-use crate::link::WrmiLink;
+use crate::link::BrowserInternal;
 use crate::protocol::{GET, REP};
 
 pub struct RetrieveFuture<'a, T: DeserializeOwned> {
     pub(crate) id: u64,
     pub(crate) ret_id: Option<u64>,
-    pub(crate) link: &'a Mutex<WrmiLink>,
+    pub(crate) link: &'a Mutex<BrowserInternal>,
     _phantom: PhantomData<Pin<Box<T>>>,
 }
 
 impl<'a, T: DeserializeOwned> RetrieveFuture<'a, T> {
-    pub(crate) fn new(id: u64, link: &'a Mutex<WrmiLink>) -> Self {
+    pub(crate) fn new(id: u64, link: &'a Mutex<BrowserInternal>) -> Self {
         Self {
             id,
             ret_id: None,

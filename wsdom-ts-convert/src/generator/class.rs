@@ -271,15 +271,23 @@ impl<'a> Context<'a> {
         let arg_types = method.args.iter().map(|arg| {
             let ty = self.simplify_type(arg.ty.to_owned());
             let ty = if arg.optional {
-                SimplifiedType {
-                    name: "__translate_nullable",
-                    args: vec![ty],
-                }
+                self.unify_types(
+                    ty,
+                    SimplifiedType {
+                        name: "__translate_nullish",
+                        args: vec![],
+                    },
+                )
             } else {
                 ty
             };
-            let arg_type = self.convert_type(ty);
-            quote! {&impl __wsdom_load_ts_macro::ToJs<#arg_type>}
+            let ty_name = ty.name;
+            let ty_tokens = self.convert_type(ty);
+            if self.classes.contains(ty_name) {
+                quote! {& #ty_tokens }
+            } else {
+                quote! {&dyn __wsdom_load_ts_macro::ToJs< #ty_tokens >}
+            }
         });
         let last_arg_variadic = method.args.iter().any(|arg| arg.variadic);
         let ret = self.convert_type(self.simplify_type(method.ret.to_owned()));
@@ -349,13 +357,14 @@ impl<'a> Context<'a> {
                 args: vec![ty],
             };
         }
-        let ty = self.convert_type(ty);
+        let ty_name = ty.name;
+        let ty_tokens = self.convert_type(ty);
         let field_name_snake_case = to_snake_case(field_name_str);
         let getter = {
             let getter_name_ident = new_ident_safe(&format!("get_{field_name_snake_case}"));
             if on_instance {
                 quote! {
-                    pub fn #getter_name_ident (&self) -> #ty {
+                    pub fn #getter_name_ident (&self) -> #ty_tokens {
                         __wsdom_load_ts_macro::JsCast::unchecked_from_js(
                             __wsdom_load_ts_macro::JsObject::js_get_field(self.as_ref(), &#field_name_str)
                         )
@@ -363,7 +372,7 @@ impl<'a> Context<'a> {
                 }
             } else {
                 quote! {
-                    pub fn #getter_name_ident (browser: &__wsdom_load_ts_macro::Browser) -> #ty {
+                    pub fn #getter_name_ident (browser: &__wsdom_load_ts_macro::Browser) -> #ty_tokens {
                         __wsdom_load_ts_macro::JsCast::unchecked_from_js(
                             browser.get_field(&__wsdom_load_ts_macro::RawCodeImmediate(#interface_name), &#field_name_str)
                         )
@@ -373,16 +382,22 @@ impl<'a> Context<'a> {
         };
         let setter = (!field.readonly).then(|| {
                     let setter_name_ident = new_ident_safe(&format!("set_{field_name_snake_case}"));
+                    let ty_tokens = if self.classes.contains(ty_name) {
+                        quote! {& #ty_tokens}
+                    }
+                    else {
+                        quote! {&dyn __wsdom_load_ts_macro::ToJs< #ty_tokens >}
+                    };
                     if on_instance {
                         quote!{
-                            pub fn #setter_name_ident (&self, value: &impl __wsdom_load_ts_macro::ToJs<#ty>) {
+                            pub fn #setter_name_ident (&self, value: #ty_tokens) {
                                 __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, value)
                             }
                         }
                     }
                     else {
                         quote!{
-                            pub fn #setter_name_ident (browser: &__wsdom_load_ts_macro::Browser, value: &impl __wsdom_load_ts_macro::ToJs<#ty>) {
+                            pub fn #setter_name_ident (browser: &__wsdom_load_ts_macro::Browser, value: #ty_tokens) {
                                 browser.set_field(&__wsdom_load_ts_macro::RawCodeImmediate(#interface_name), &#field_name_str, value)
                             }
                         }
@@ -424,10 +439,18 @@ impl<'a> Context<'a> {
         }
         let field_name_str = setter.name;
         let setter_name_ident = new_ident_safe(&format!("set_{}", to_snake_case(field_name_str)));
-        let ty = self.convert_type(self.simplify_type(setter.arg_ty.to_owned()));
+        let ty = self.simplify_type(setter.arg_ty.to_owned());
+        let ty_name = ty.name;
+        let ty_tokens = self.convert_type(ty);
+        let ty_tokens = if self.classes.contains(ty_name) {
+            quote! {& #ty_tokens}
+        } else {
+            quote! {&dyn __wsdom_load_ts_macro::ToJs< #ty_tokens >}
+        };
+
         Some(quote! {
-            pub fn #setter_name_ident (&self, value: #ty) {
-                __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, &value)
+            pub fn #setter_name_ident (&self, value: #ty_tokens) {
+                __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, value as &dyn __wsdom_load_ts_macro::UseInJsCode)
             }
         })
     }

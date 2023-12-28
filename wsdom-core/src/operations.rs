@@ -2,11 +2,12 @@ use std::fmt::Write;
 
 use crate::{
     js::{object::JsObject, value::JsValue},
+    js_cast::JsCast,
     link::Browser,
     protocol::{GET, SET},
     retrieve::RetrieveFuture,
+    serialize::ToJs,
     serialize::{UseInJsCode, UseInJsCodeWriter},
-    JsCast, ToJs,
 };
 
 impl Browser {

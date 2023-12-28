@@ -14,7 +14,7 @@ impl<'a> Context<'a> {
         let arg_names_body = arg_names_sig.clone();
         let arg_types = df.args.iter().map(|arg| {
             let arg_type = self.convert_type(self.simplify_type(arg.ty.to_owned()));
-            quote! {&impl __wsdom_load_ts_macro::ToJs<#arg_type>}
+            quote! {&dyn __wsdom_load_ts_macro::ToJs<#arg_type>}
         });
         let last_arg_variadic = df.args.iter().any(|arg| arg.variadic);
         let ret = self.convert_type(self.simplify_type(df.ret.to_owned()));
