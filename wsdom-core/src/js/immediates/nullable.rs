@@ -15,7 +15,7 @@ impl UseInJsCode for NullImmediate {
 impl ToJs<JsNullish> for NullImmediate {}
 impl<T> ToJs<JsNullable<T>> for NullImmediate {}
 
-impl<T: UseInJsCode> UseInJsCode for Option<T> {
+impl<'a, T: UseInJsCode> UseInJsCode for Option<&'a T> {
     fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Some(t) => t.serialize_to(buf),
@@ -24,7 +24,7 @@ impl<T: UseInJsCode> UseInJsCode for Option<T> {
     }
 }
 
-impl<T, U> ToJs<JsNullable<T>> for Option<U>
+impl<'a, T, U> ToJs<JsNullable<T>> for Option<&'a U>
 where
     T: JsCast,
     U: UseInJsCode + ToJs<T>,

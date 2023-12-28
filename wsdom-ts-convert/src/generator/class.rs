@@ -266,45 +266,10 @@ impl<'a> Context<'a> {
             }
         }
         let method_name_ident = new_ident_safe(&rust_name_str);
-        let arg_names_sig = method.args.iter().map(|arg| new_ident_safe(arg.name));
+        let (arg_types, arg_names_sig, last_arg_variadic) = self.make_sig_args(&method.args);
         let arg_names_body = arg_names_sig.clone();
-        let arg_types = method.args.iter().map(|arg| {
-            let ty = self.simplify_type(arg.ty.to_owned());
-            let ty = if arg.optional {
-                self.unify_types(
-                    ty,
-                    SimplifiedType {
-                        name: "__translate_nullish",
-                        args: vec![],
-                    },
-                )
-            } else {
-                ty
-            };
-            let ty_name = ty.name;
-            let ty_tokens = self.convert_type(ty);
-            if self.classes.contains(ty_name) {
-                quote! {& #ty_tokens }
-            } else {
-                quote! {&dyn __wsdom_load_ts_macro::ToJs< #ty_tokens >}
-            }
-        });
-        let last_arg_variadic = method.args.iter().any(|arg| arg.variadic);
         let ret = self.convert_type(self.simplify_type(method.ret.to_owned()));
-        let method_generics = method.generics.args.iter().map(|gen| {
-                    let name = new_ident_safe(gen.name);
-                    let bounds = gen.extends.clone().map(|ty| self.convert_type(self.simplify_type(ty))).into_iter();
-                    quote! {
-                        #name: __wsdom_load_ts_macro::JsCast #(+ ::core::convert::AsRef<#bounds> + ::core::convert::Into<#bounds>)*
-                    }
-                });
-        let method_generics = if method.generics.args.is_empty() {
-            None
-        } else {
-            Some(quote! {
-                <#(#method_generics,)*>
-            })
-        };
+        let method_generics = self.make_sig_generics(&method.generics.args);
         if on_instance {
             Some(quote! {
                 pub fn #method_name_ident #method_generics (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {

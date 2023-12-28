@@ -1,6 +1,7 @@
 mod alias;
 mod class;
 mod function;
+mod signature;
 mod types;
 mod util;
 mod var;

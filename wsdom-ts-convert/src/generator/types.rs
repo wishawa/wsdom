@@ -22,6 +22,7 @@ pub(super) mod known_types {
     pub(crate) const UNKNOWN: SimplifiedType = simple_named_type("unknown");
     pub(crate) const OBJECT: SimplifiedType = simple_named_type("object");
     pub(crate) const STRING: SimplifiedType = simple_named_type("string");
+    pub(crate) const NULL: SimplifiedType = simple_named_type("__translate_nullish");
 }
 
 #[derive(Clone, PartialEq)]

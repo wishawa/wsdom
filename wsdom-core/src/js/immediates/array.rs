@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use crate::serialize::UseInJsCode;
 
-impl<U> UseInJsCode for [U]
+impl<'a, U, const N: usize> UseInJsCode for [&'a U; N]
 where
     U: UseInJsCode,
 {

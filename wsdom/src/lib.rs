@@ -3,7 +3,8 @@ pub use wsdom_macros::load_ts;
 #[doc(hidden)]
 pub mod __wsdom_load_ts_macro {
     pub use ref_cast::RefCast;
-    pub use wsdom_core::{js_types::*, Browser, JsCast, ToJs, UseInJsCode};
+    pub use wsdom_core::{js_types::*, Browser, JsCast, RawCodeImmediate, ToJs, UseInJsCode};
+    pub use wsdom_javascript::Array;
 }
 
 pub use wsdom_core::{js_types, Browser, JsCast, ToJs};

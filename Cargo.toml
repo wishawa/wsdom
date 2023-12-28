@@ -8,3 +8,4 @@ members = [
 	"wsdom-dom/",
 	"examples/simple/"
 ]
+resolver = "2"

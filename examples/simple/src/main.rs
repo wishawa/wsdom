@@ -41,7 +41,8 @@ async fn handle_socket(socket: WebSocket) {
             let num = number.retrieve_float().await;
             assert_eq!(num, (2.0f64).exp());
             tokio::time::sleep(Duration::from_secs(1)).await;
-            wsdom::dom::alert(&browser, &"done");
+            wsdom::dom::alert(&browser, &Some(&"done"));
+            wsdom::dom::console(&browser).debug(&[&1, &2, &3]);
         }
     });
 

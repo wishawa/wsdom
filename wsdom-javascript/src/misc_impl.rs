@@ -1,7 +1,7 @@
 use super::Array;
 use wsdom_core::{JsCast, ToJs};
 
-impl<T, U> ToJs<Array<T>> for [U]
+impl<'a, T, U, const N: usize> ToJs<Array<T>> for [&'a U; N]
 where
     T: JsCast,
     U: ToJs<T>,
