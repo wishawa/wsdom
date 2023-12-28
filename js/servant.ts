@@ -4,14 +4,16 @@ type SendMessage = (msg: string) => void;
 
 function startWebSocketWRMI(wsUrl: string | URL, wsProtocols?: string | string[]) {
 	const ws = new WebSocket(wsUrl, wsProtocols);
-	const wrmi = new WRMI(ws.send);
+	const wsdom = new WRMI((msg: string) => {
+		ws.send(msg);
+	});
 	ws.onopen = () => {
 		console.debug("WRMI WS connection open!");
 		console.debug("WebSocket object", ws);
-		console.debug("WRMI object", wrmi);
+		console.debug("WRMI object", wsdom);
 	}
 	ws.onmessage = (msg: MessageEvent<string>) => {
-		wrmi.handleIncomingMessage(msg.data);
+		wsdom.handleIncomingMessage(msg.data);
 	};
 }
 class WRMI {
@@ -40,8 +42,8 @@ class WRMIInternal {
 	public d = (id: Id) => {
 		this.values.delete(id);
 	}
-	public r = (id: Id) => {
-		const valJson = JSON.stringify(this.g(id));
+	public r = (id: Id, val: Value) => {
+		const valJson = JSON.stringify(val);
 		(this.sender)(`${id}:${valJson}`);
 	}
 }

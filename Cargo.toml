@@ -1,10 +1,10 @@
 [workspace]
 members = [
-	"wrmi/",
-	"wrmi-core/",
-	"wrmi-macros/",
-	"wrmi-ts-convert/",
-	"wrmi-javascript/",
-	"wrmi-dom/",
+	"wsdom/",
+	"wsdom-core/",
+	"wsdom-macros/",
+	"wsdom-ts-convert/",
+	"wsdom-javascript/",
+	"wsdom-dom/",
 	"examples/simple/"
 ]

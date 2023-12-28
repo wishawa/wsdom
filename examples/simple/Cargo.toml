@@ -9,4 +9,4 @@ edition = "2021"
 axum = { version = "0.7.2", features = ["ws"] }
 tokio = { version = "1.34.0", features = ["full"] }
 futures-util = { version = "0.3.30" }
-wrmi = { path = "../../wrmi/" }
+wsdom = { path = "../../wsdom/" }

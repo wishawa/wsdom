@@ -6,7 +6,8 @@ use axum::{
     routing::get,
     Router,
 };
-use wrmi::js_types::{JsValue, NullImmediate};
+use futures_util::SinkExt;
+use wsdom::js_types::NullImmediate;
 
 #[tokio::main]
 async fn main() {
@@ -20,14 +21,14 @@ async fn handler(ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(handle_socket)
 }
 
-async fn handle_socket(mut socket: WebSocket) {
+async fn handle_socket(socket: WebSocket) {
     use futures_util::StreamExt;
-    let browser = wrmi::Browser::new();
-    let mut outgoing = browser.get_outgoing_stream();
+    let browser = wsdom::Browser::new();
+
     tokio::spawn({
         let browser = browser.clone();
         async move {
-            let document = wrmi::dom::document(&browser);
+            let document = wsdom::dom::document(&browser);
             let body = document.get_body();
             body.set_inner_text(&"connected!");
             for i in 0..5 {
@@ -38,34 +39,57 @@ async fn handle_socket(mut socket: WebSocket) {
                 body.append_child(&txt);
                 body.append_child(&elem);
             }
-            wrmi::dom::alert(&browser, &"done");
-            wrmi::dom::alert(
-                &browser,
-                &Into::<JsValue>::into(wrmi::js::Math::exp(&browser, &2.0)),
-            );
+            let number = wsdom::js::Math::exp(&browser, &2.0);
+            let num = number.retrieve_float().await;
+            assert_eq!(num, (2.0f64).exp());
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            wsdom::dom::alert(&browser, &"done");
         }
     });
-    loop {
-        tokio::select! {
-            msg = socket.recv() => {
-                match msg {
-                    Some(Ok(Message::Text(txt))) => {
-                        browser.receive_incoming_message(txt);
-                    },
-                    _ => break
-                }
-            }
-            s = outgoing.next() => {
-                match s {
-                    Some(s) => {
-                        match socket.send(Message::Text(s)).await {
-                            Ok(_) => {}
-                            Err(_) => break
-                        }
-                    }
-                    _ => break
-                }
+
+    let (mut tx, mut rx) = socket.split();
+    let tx_fut = {
+        let browser = browser.clone();
+        async move {
+            tx.send_all(
+                &mut browser
+                    .get_outgoing_stream()
+                    .map(|msg| Ok(Message::Text(msg))),
+            )
+            .await
+        }
+    };
+    let rx_fut = {
+        let browser = browser.clone();
+        async move {
+            while let Some(Ok(Message::Text(msg))) = rx.next().await {
+                browser.receive_incoming_message(msg);
             }
         }
-    }
+    };
+    let _todo = tokio::join!(tx_fut, rx_fut);
+
+    // loop {
+    //     tokio::select! {
+    //         msg = socket.recv() => {
+    //             match msg {
+    //                 Some(Ok(Message::Text(txt))) => {
+    //                     browser.receive_incoming_message(txt);
+    //                 },
+    //                 _ => break
+    //             }
+    //         }
+    //         s = outgoing.next() => {
+    //             match s {
+    //                 Some(s) => {
+    //                     match socket.send(Message::Text(s)).await {
+    //                         Ok(_) => {}
+    //                         Err(_) => break
+    //                     }
+    //                 }
+    //                 _ => break
+    //             }
+    //         }
+    //     }
+    // }
 }
