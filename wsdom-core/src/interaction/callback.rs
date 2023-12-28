@@ -1,43 +1,94 @@
-use std::{marker::PhantomData, pin::Pin, task::Poll};
+use std::{fmt::Write, marker::PhantomData, pin::Pin, task::Poll};
 
-use futures_core::Future;
-
-use crate::{js::value::JsValue, js_cast::JsCast, link::Browser};
+use crate::{
+    js::value::JsValue,
+    js_cast::JsCast,
+    link::{Browser, RetrievalState},
+    protocol::{GET, REP, SET},
+};
 
 pub struct Callback<E> {
-    val_id: u64,
+    arr_id: u64,
     ret_id: u64,
     browser: Browser,
+    consumed: usize,
     _phantom: PhantomData<Pin<Box<E>>>,
 }
 
-impl<E: JsCast> Future for Callback<E> {
-    type Output = E;
+impl<E: JsCast> futures_core::Stream for Callback<E> {
+    type Item = E;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         let mut link = this.browser.0.lock().unwrap();
-        if link.retrieve_values.remove(&this.ret_id).is_some() {
-            return Poll::Ready(E::unchecked_from_js(JsValue {
-                browser: this.browser.clone(),
-                id: this.val_id,
-            }));
-        }
-        let waker = cx.waker();
-        match link.retrieve_wakers.entry(this.ret_id) {
+        let ret_id = this.ret_id;
+        match link.retrievals.entry(ret_id) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {
-                if !occ.get().will_wake(waker) {
-                    occ.insert(waker.to_owned());
+                let state = occ.get_mut();
+
+                let new_waker = cx.waker();
+                if !state.waker.will_wake(new_waker) {
+                    state.waker = new_waker.to_owned();
+                }
+
+                if state.times > this.consumed {
+                    this.consumed += 1;
+                    let val_id = link.get_new_id();
+                    let arr_id = this.arr_id;
+                    writeln!(
+                        link.raw_commands_buf(),
+                        "{SET}({val_id}, {GET}({arr_id}).shift());"
+                    )
+                    .unwrap();
+                    link.wake_outgoing_lazy();
+                    Poll::Ready(Some(JsCast::unchecked_from_js(JsValue {
+                        id: val_id,
+                        browser: this.browser.to_owned(),
+                    })))
+                } else {
+                    Poll::Pending
                 }
             }
             std::collections::hash_map::Entry::Vacant(vac) => {
-                vac.insert(waker.to_owned());
+                vac.insert(RetrievalState {
+                    waker: cx.waker().to_owned(),
+                    last_value: String::new(),
+                    times: 0,
+                });
+                Poll::Pending
             }
         }
-        Poll::Pending
+    }
+}
+impl<E> Drop for Callback<E> {
+    fn drop(&mut self) {
+        let mut link = self.browser.0.lock().unwrap();
+        let ret_id = self.ret_id;
+        link.retrievals.remove(&ret_id);
     }
 }
 
-fn new_callback<E>() -> (Callback<E>, JsValue) {
-    todo!()
+pub fn new_callback<E>(browser: &Browser) -> (Callback<E>, JsValue) {
+    let mut link = browser.0.lock().unwrap();
+    let arr_id = link.get_new_id();
+    let ret_id = link.get_new_id();
+    let func_id = link.get_new_id();
+    let func = JsValue {
+        browser: browser.to_owned(),
+        id: func_id,
+    };
+    writeln!(link.raw_commands_buf(),
+"{SET}({arr_id}, []); {SET}({func_id}, function(e) {{ {GET}({arr_id}).push(e); {REP}({ret_id}, 0) }});").unwrap();
+    link.wake_outgoing_lazy();
+    let callback = Callback {
+        browser: browser.to_owned(),
+        ret_id,
+        arr_id,
+        consumed: 0,
+        _phantom: PhantomData,
+    };
+    (callback, func)
 }

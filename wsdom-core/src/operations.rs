@@ -68,15 +68,15 @@ impl Browser {
             let out_id = link.get_new_id();
             let base_obj = UseInJsCodeWriter(base_obj);
             let property = UseInJsCodeWriter(property);
-            if write!(
+            if writeln!(
                 link.raw_commands_buf(),
-                "{SET}({out_id},({base_obj})[{property}]);\n"
+                "{SET}({out_id},({base_obj})[{property}]);"
             )
             .is_err()
             {
                 link.kill(Box::new(CommandSerializeFailed));
             }
-            link.wake_outgoing();
+            link.wake_outgoing_lazy();
             out_id
         };
         JsValue { id, browser }
@@ -94,12 +94,7 @@ impl Browser {
             UseInJsCodeWriter(property),
             UseInJsCodeWriter(value),
         );
-        if write!(
-            link.raw_commands_buf(),
-            "({base_obj})[{property}]={value};\n"
-        )
-        .is_err()
-        {
+        if writeln!(link.raw_commands_buf(), "({base_obj})[{property}]={value};").is_err() {
             link.kill(Box::new(CommandSerializeFailed));
         }
         link.wake_outgoing();
@@ -112,7 +107,7 @@ impl Browser {
 
     pub fn run_raw_code<'a>(&'a self, code: std::fmt::Arguments<'a>) {
         let mut link = self.0.lock().unwrap();
-        if write!(link.raw_commands_buf(), "{{ {code} }}").is_err() {
+        if writeln!(link.raw_commands_buf(), "{{ {code} }}").is_err() {
             link.kill(Box::new(CommandSerializeFailed));
         }
         link.wake_outgoing();
@@ -121,7 +116,7 @@ impl Browser {
     pub fn value_from_raw_code<'a>(&'a self, code: std::fmt::Arguments<'a>) -> JsValue {
         let mut link = self.0.lock().unwrap();
         let out_id = link.get_new_id();
-        write!(link.raw_commands_buf(), "{SET}({out_id},{code});").unwrap();
+        writeln!(link.raw_commands_buf(), "{SET}({out_id},{code});").unwrap();
         link.wake_outgoing();
         JsValue {
             id: out_id,
@@ -148,15 +143,15 @@ impl JsObject {
             let out_id = link.get_new_id();
             let self_id = self.id;
             let property = UseInJsCodeWriter(property);
-            if write!(
+            if writeln!(
                 link.raw_commands_buf(),
-                "{SET}({out_id},{GET}({self_id})[{property}]);\n"
+                "{SET}({out_id},{GET}({self_id})[{property}]);"
             )
             .is_err()
             {
                 link.kill(Box::new(CommandSerializeFailed));
             }
-            link.wake_outgoing();
+            link.wake_outgoing_lazy();
             out_id
         };
         JsValue { id, browser }
@@ -165,9 +160,9 @@ impl JsObject {
         let self_id = self.id;
         let mut link = self.browser.0.lock().unwrap();
         let (property, value) = (UseInJsCodeWriter(property), UseInJsCodeWriter(value));
-        if write!(
+        if writeln!(
             link.raw_commands_buf(),
-            "{GET}({self_id})[{property}]={value};\n"
+            "{GET}({self_id})[{property}]={value};"
         )
         .is_err()
         {

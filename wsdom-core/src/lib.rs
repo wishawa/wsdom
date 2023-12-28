@@ -17,5 +17,6 @@ pub mod js_types {
         value::JsValue,
     };
 }
+pub use interaction::callback;
 pub use js_cast::JsCast;
 pub use serialize::{RawCodeImmediate, ToJs, UseInJsCode};

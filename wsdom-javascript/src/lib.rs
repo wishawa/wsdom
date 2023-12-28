@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 
 mod __wsdom_load_ts_macro {
-    pub use super::Array;
     pub use ref_cast::RefCast;
     pub use wsdom_core::{js_types::*, Browser, JsCast, RawCodeImmediate, ToJs, UseInJsCode};
 }

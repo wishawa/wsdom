@@ -6,6 +6,7 @@ members = [
 	"wsdom/",
 	"wsdom-javascript/",
 	"wsdom-dom/",
-	"examples/simple/"
+	"examples/simple/",
+	"examples/counter"
 ]
 resolver = "2"

@@ -17,8 +17,7 @@ pub struct Browser(pub(crate) Arc<Mutex<BrowserInternal>>);
 impl Browser {
     pub fn new() -> Self {
         let link = BrowserInternal {
-            retrieve_values: HashMap::new(),
-            retrieve_wakers: HashMap::new(),
+            retrievals: HashMap::new(),
             last_id: 1,
             commands_buf: String::new(),
             outgoing_waker: None,
@@ -72,12 +71,18 @@ impl futures_core::Stream for OutgoingMessages {
 
 #[derive(Debug)]
 pub struct BrowserInternal {
-    pub(crate) retrieve_wakers: HashMap<u64, Waker>,
-    pub(crate) retrieve_values: HashMap<u64, String>,
+    pub(crate) retrievals: HashMap<u64, RetrievalState>,
     last_id: u64,
     commands_buf: String,
     outgoing_waker: Option<Waker>,
     dead: Option<Box<dyn Error + Send>>,
+}
+
+#[derive(Debug)]
+pub(crate) struct RetrievalState {
+    pub(crate) waker: Waker,
+    pub(crate) last_value: String,
+    pub(crate) times: usize,
 }
 
 impl BrowserInternal {
@@ -86,13 +91,15 @@ impl BrowserInternal {
             .split_once(':')
             .and_then(|(id, _)| id.parse::<u64>().ok())
         {
-            Some(id) => {
-                if let Some(waker) = self.retrieve_wakers.remove(&id) {
-                    self.retrieve_values.insert(id, message);
-                    waker.wake();
+            Some(id) => match self.retrievals.get_mut(&id) {
+                Some(s) => {
+                    s.times += 1;
+                    s.last_value = message;
+                    s.waker.wake_by_ref();
                 }
-            }
-            None => self.kill(Box::new(InvalidReturn)),
+                _ => {}
+            },
+            None => {}
         }
     }
     pub fn raw_commands_buf(&mut self) -> &mut String {
@@ -111,6 +118,9 @@ impl BrowserInternal {
         if let Some(waker) = self.outgoing_waker.as_ref() {
             waker.wake_by_ref();
         }
+    }
+    pub(crate) fn wake_outgoing_lazy(&mut self) {
+        self.wake_outgoing();
     }
 }
 

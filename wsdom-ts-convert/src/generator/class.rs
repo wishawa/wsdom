@@ -339,7 +339,7 @@ impl<'a> Context<'a> {
                 quote! {
                     pub fn #getter_name_ident (browser: &__wsdom_load_ts_macro::Browser) -> #ty_tokens {
                         __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-                            browser.get_field(&__wsdom_load_ts_macro::RawCodeImmediate(#interface_name), &#field_name_str)
+                            browser.get_field(&__wsdom_load_ts_macro::RawCodeImmediate( #interface_name ), &#field_name_str)
                         )
                     }
                 }
@@ -363,7 +363,7 @@ impl<'a> Context<'a> {
                     else {
                         quote!{
                             pub fn #setter_name_ident (browser: &__wsdom_load_ts_macro::Browser, value: #ty_tokens) {
-                                browser.set_field(&__wsdom_load_ts_macro::RawCodeImmediate(#interface_name), &#field_name_str, value)
+                                browser.set_field(&__wsdom_load_ts_macro::RawCodeImmediate( #interface_name ), &#field_name_str, value)
                             }
                         }
                     }

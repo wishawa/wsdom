@@ -7,22 +7,24 @@ pub mod __wsdom_load_ts_macro {
     pub use wsdom_javascript::Array;
 }
 
+pub use wsdom_core::callback;
 pub use wsdom_core::{js_types, Browser, JsCast, ToJs};
 pub use wsdom_dom as dom;
 pub use wsdom_javascript as js;
 
+#[allow(non_snake_case)]
 #[cfg(test)]
 mod tests {
     #[test]
     fn dummy() {
         use super::__wsdom_load_ts_macro;
-        use wsdom_javascript::*;
+        // use wsdom_javascript::*;
         wsdom_macros::load_ts!("../typescript-defs/test/dummy.d.ts");
     }
     #[test]
     fn history() {
         use super::__wsdom_load_ts_macro;
-        use wsdom_javascript::*;
+        // use wsdom_javascript::*;
         wsdom_macros::load_ts!("../typescript-defs/test/history.d.ts");
     }
 
@@ -43,7 +45,7 @@ mod tests {
     #[test]
     fn unify_nullable() {
         use super::__wsdom_load_ts_macro;
-        use wsdom_javascript::*;
+        // use wsdom_javascript::*;
         wsdom_macros::load_ts!("../typescript-defs/test/unify-null.d.ts");
     }
 

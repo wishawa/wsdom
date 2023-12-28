@@ -14,8 +14,8 @@ impl Drop for JsValue {
     fn drop(&mut self) {
         let self_id = self.id;
         let mut link = self.browser.0.lock().unwrap();
-        write!(link.raw_commands_buf(), "{DEL}({self_id});\n",).unwrap();
-        link.wake_outgoing();
+        writeln!(link.raw_commands_buf(), "{DEL}({self_id});",).unwrap();
+        link.wake_outgoing_lazy();
     }
 }
 
@@ -25,11 +25,8 @@ impl Clone for JsValue {
         let out_id = {
             let mut link = self.browser.0.lock().unwrap();
             let out_id = link.get_new_id();
-            write!(
-                link.raw_commands_buf(),
-                "{SET}({out_id},{GET}({self_id}));\n"
-            )
-            .unwrap();
+            writeln!(link.raw_commands_buf(), "{SET}({out_id},{GET}({self_id}));").unwrap();
+            link.wake_outgoing_lazy();
             out_id
         };
         Self {
