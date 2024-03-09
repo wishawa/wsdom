@@ -55,3 +55,67 @@ macro_rules! expand_class_def {
 
     };
 }
+
+#[macro_export]
+macro_rules! expand_field_getter_setter {
+    (self @ $getter_name:ident, $getter_ty:ty, $setter_name:ident, $setter_ty:ty, $field_name:literal) => {
+        pub fn $getter_name(&self) -> $getter_ty {
+            __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+                __wsdom_load_ts_macro::JsObject::js_get_field(self.as_ref(), &$field_name),
+            )
+        }
+        pub fn $setter_name(&self, value: $setter_ty) {
+            __wsdom_load_ts_macro::JsObject::js_set_field(
+                self.as_ref(),
+                &$field_name,
+                __wsdom_load_ts_macro::UpcastWorkaround::new(value).cast(),
+            )
+        }
+    };
+    (browser @ $getter_name:ident, $getter_ty:ty, $setter_name:ident, $setter_ty:ty, $field_name:literal, $iface_name:literal) => {
+        pub fn $getter_name(browser: &__wsdom_load_ts_macro::Browser) -> $getter_ty {
+            __wsdom_load_ts_macro::JsCast::unchecked_from_js(browser.get_field(
+                &__wsdom_load_ts_macro::RawCodeImmediate($iface_name),
+                &$field_name,
+            ))
+        }
+        pub fn $setter_name(browser: &__wsdom_load_ts_macro::Browser, value: $setter_ty) {
+            browser.set_field(
+                &__wsdom_load_ts_macro::RawCodeImmediate($iface_name),
+                &$field_name,
+                __wsdom_load_ts_macro::UpcastWorkaround::new(value).cast(),
+            )
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! expand_method {
+    (self @ $method_name:ident, [$($generics:tt)*], [$($arg_names:ident : $arg_types:ty,)*], $ret:ty, $js_name:literal, $last_variadic:literal) => {
+        pub fn $method_name $($generics)* (&self, $($arg_names: $arg_types,)*) -> $ret {
+            __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+                __wsdom_load_ts_macro::JsObject::js_call_method(self.as_ref(), $js_name, [
+                    $(  __wsdom_load_ts_macro::UpcastWorkaround::new( $arg_names ).cast(), )*
+                ], $last_variadic)
+            )
+        }
+    };
+    (constructor @ $method_name:ident, [$($arg_names:ident : $arg_types:ty,)*], $ret:ty, $interface_name:literal, $last_variadic:literal) => {
+        pub fn $method_name (browser: &__wsdom_load_ts_macro::Browser, $($arg_names: $arg_types,)*) -> $ret {
+            __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+                browser.call_constructor($interface_name, [
+                    $(  __wsdom_load_ts_macro::UpcastWorkaround::new( $arg_names ).cast(), )*
+                ], $last_variadic)
+            )
+        }
+    };
+    (free @ $method_name:ident, [$($generics:tt)*], [$($arg_names:ident : $arg_types:ty,)*], $ret:ty, $function_name:literal, $last_variadic:literal) => {
+        pub fn $method_name $($generics)* (browser: &__wsdom_load_ts_macro::Browser, $($arg_names: $arg_types,)*) -> $ret {
+            __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+                browser.call_function($function_name, [
+                    $(  __wsdom_load_ts_macro::UpcastWorkaround::new( $arg_names ).cast(), )*
+                ], $last_variadic)
+            )
+        }
+    };
+}

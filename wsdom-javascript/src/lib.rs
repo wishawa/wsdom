@@ -7,7 +7,7 @@ mod __wsdom_load_ts_macro {
         js_types::*,
         Browser, JsCast, ToJs, UseInJsCode,
     };
-    pub use wsdom_macros_decl::expand_class_def;
+    pub use wsdom_macros_decl::*;
 }
 
 wsdom_macros::load_ts!("../typescript-defs/used/es5-handpicked.d.ts");

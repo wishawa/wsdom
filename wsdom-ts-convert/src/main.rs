@@ -49,8 +49,9 @@ fn work(dts_path: &str, output_path: &str) {
 #![allow(non_camel_case_types)]
 mod __wsdom_load_ts_macro {{
     pub use ref_cast::RefCast;
-    pub use wsdom_core::{{js_types::*, Browser, JsCast, ToJs, UseInJsCode, RawCodeImmediate}};
+    pub use wsdom_core::{{js_types::*, Browser, JsCast, ToJs, UseInJsCode, for_macro::{{RawCodeImmediate, UpcastWorkaround}}}};
     pub use wsdom_javascript::Array;
+    pub use wsdom_macros_decl::*;
 }}
 use wsdom_javascript::*;
 

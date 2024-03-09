@@ -9,7 +9,7 @@ pub mod __wsdom_load_ts_macro {
         Browser, JsCast, ToJs, UseInJsCode,
     };
     pub use wsdom_javascript::Array;
-    pub use wsdom_macros_decl::expand_class_def;
+    pub use wsdom_macros_decl::*;
 }
 
 pub use wsdom_core::callback;

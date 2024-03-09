@@ -110,7 +110,6 @@ impl<'a> Context<'a> {
 
         let extends = ancestors.into_iter().map(|anc| self.convert_type(anc));
 
-        // let generics_with_bounds_iter = generics_with_bounds.as_ref().into_iter();
         let tokens = quote! {
             __wsdom_load_ts_macro::expand_class_def!(
                 #generics_for_phantom,
@@ -163,6 +162,15 @@ impl<'a> Context<'a> {
 
                 let mut last_method_name = MethodName::Name("");
                 for (method, on_instance) in methods {
+                    let field_name_conflict = match method.name {
+                        MethodName::Name(name)
+                            if (name.starts_with("set") || name.starts_with("get"))
+                                && name.chars().nth(3).is_some_and(|c| c.is_ascii_uppercase()) =>
+                        {
+                            true
+                        }
+                        _ => false,
+                    };
                     let is_overload = method.name == last_method_name;
                     last_method_name = method.name.clone();
                     member_tokens.push(self.make_method_code(
@@ -170,6 +178,7 @@ impl<'a> Context<'a> {
                         method,
                         on_instance,
                         is_overload,
+                        field_name_conflict,
                     ));
                 }
             }
@@ -211,6 +220,7 @@ impl<'a> Context<'a> {
         method: &Method<'_>,
         on_instance: bool,
         is_overload: bool,
+        field_name_conflict: bool,
     ) -> Option<TokenStream> {
         let is_constructor =
             !on_instance && matches!(method.name, crate::parser::method::MethodName::Constructor);
@@ -228,46 +238,64 @@ impl<'a> Context<'a> {
                 rust_name_str.push('_');
                 rust_name_str.push_str(arg.name);
             }
-        }
-        let method_name_ident = new_ident_safe(&rust_name_str);
-        let (arg_types, arg_names_sig, last_arg_variadic) = self.make_sig_args(&method.args);
-        let arg_names_body = arg_names_sig.clone();
-        let ret = self.convert_type(self.simplify_type(method.ret.to_owned()));
-        let method_generics = self.make_sig_generics(&method.generics.args);
-        if on_instance {
-            Some(quote! {
-                pub fn #method_name_ident #method_generics (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {
-                    __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-                        __wsdom_load_ts_macro::JsObject::js_call_method(self.as_ref(), #method_name_str, [
-                            #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
-                        ], #last_arg_variadic)
-                    )
-                }
-            })
         } else {
-            if is_constructor {
-                Some(quote! {
-                    pub fn #method_name_ident (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
-                        __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-                            browser.call_constructor(#interface_name, [
-                                #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
-                            ], #last_arg_variadic)
-                        )
-                    }
-                })
-            } else {
-                let function = format!("{}.{}", interface_name, method_name_str);
-                Some(quote! {
-                    pub fn #method_name_ident #method_generics (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
-                        __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-                            browser.call_function(#function, [
-                                #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
-                            ], #last_arg_variadic)
-                        )
-                    }
-                })
+            if field_name_conflict {
+                rust_name_str.push_str("_method");
             }
         }
+        let method_name_ident = new_ident_safe(&rust_name_str);
+        let (arg_types, arg_names, last_arg_variadic) = self.make_sig_args(&method.args);
+        // let arg_names_body = arg_names_sig.clone();
+        let ret = self.convert_type(self.simplify_type(method.ret.to_owned()));
+        let method_generics = self.make_sig_generics(&method.generics.args);
+        Some(match (on_instance, is_constructor) {
+            (true, _) => quote! {
+                __wsdom_load_ts_macro::expand_method!(self @ #method_name_ident, [#method_generics], [#(#arg_names : #arg_types,)*], #ret, #method_name_str, #last_arg_variadic);
+            },
+            (false, true) => quote! {
+                __wsdom_load_ts_macro::expand_method!(constructor @ #method_name_ident, [#(#arg_names : #arg_types,)*], #ret, #interface_name, #last_arg_variadic);
+            },
+            (false, false) => {
+                let function = format!("{}.{}", interface_name, method_name_str);
+                quote! {
+                    __wsdom_load_ts_macro::expand_method!(free @ #method_name_ident, [#method_generics], [#(#arg_names : #arg_types,)*], #ret, #function, #last_arg_variadic);
+                }
+            }
+        })
+        // if on_instance {
+        //     Some(quote! {
+        //         pub fn #method_name_ident #method_generics (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {
+        //             __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+        //                 __wsdom_load_ts_macro::JsObject::js_call_method(self.as_ref(), #method_name_str, [
+        //                     #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
+        //                 ], #last_arg_variadic)
+        //             )
+        //         }
+        //     })
+        // } else {
+        //     if is_constructor {
+        //         Some(quote! {
+        //             pub fn #method_name_ident (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
+        //                 __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+        //                     browser.call_constructor(#interface_name, [
+        //                         #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
+        //                     ], #last_arg_variadic)
+        //                 )
+        //             }
+        //         })
+        //     } else {
+        //         let function = format!("{}.{}", interface_name, method_name_str);
+        //         Some(quote! {
+        //             pub fn #method_name_ident #method_generics (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
+        //                 __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+        //                     browser.call_function(#function, [
+        //                         #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
+        //                     ], #last_arg_variadic)
+        //                 )
+        //             }
+        //         })
+        //     }
+        // }
     }
     fn make_field_code(
         &self,
@@ -289,53 +317,69 @@ impl<'a> Context<'a> {
         let ty_name = ty.name;
         let ty_tokens = self.convert_type(ty);
         let field_name_snake_case = to_snake_case(field_name_str);
-        let getter = {
-            let getter_name_ident = new_ident_safe(&format!("get_{field_name_snake_case}"));
-            if on_instance {
-                quote! {
-                    pub fn #getter_name_ident (&self) -> #ty_tokens {
-                        __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-                            __wsdom_load_ts_macro::JsObject::js_get_field(self.as_ref(), &#field_name_str)
-                        )
-                    }
-                }
-            } else {
-                quote! {
-                    pub fn #getter_name_ident (browser: &__wsdom_load_ts_macro::Browser) -> #ty_tokens {
-                        __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-                            browser.get_field(&__wsdom_load_ts_macro::RawCodeImmediate( #interface_name ), &#field_name_str)
-                        )
-                    }
-                }
-            }
+
+        let getter_name_ident = new_ident_safe(&format!("get_{field_name_snake_case}"));
+        let setter_name_ident = new_ident_safe(&format!("set_{field_name_snake_case}"));
+        let setter_ty_tokens = if self.classes.contains(ty_name) {
+            quote! {& #ty_tokens}
+        } else {
+            quote! {&dyn __wsdom_load_ts_macro::ToJs< #ty_tokens >}
         };
-        let setter = (!field.readonly).then(|| {
-                    let setter_name_ident = new_ident_safe(&format!("set_{field_name_snake_case}"));
-                    let ty_tokens = if self.classes.contains(ty_name) {
-                        quote! {& #ty_tokens}
-                    }
-                    else {
-                        quote! {&dyn __wsdom_load_ts_macro::ToJs< #ty_tokens >}
-                    };
-                    if on_instance {
-                        quote!{
-                            pub fn #setter_name_ident (&self, value: #ty_tokens) {
-                                __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, __wsdom_load_ts_macro::UpcastWorkaround::new(value).cast())
-                            }
-                        }
-                    }
-                    else {
-                        quote!{
-                            pub fn #setter_name_ident (browser: &__wsdom_load_ts_macro::Browser, value: #ty_tokens) {
-                                browser.set_field(&__wsdom_load_ts_macro::RawCodeImmediate( #interface_name ), &#field_name_str, value)
-                            }
-                        }
-                    }
-                });
-        Some(quote! {
-            #getter
-            #setter
+        Some(if on_instance {
+            quote! {
+                __wsdom_load_ts_macro::expand_field_getter_setter!(self @ #getter_name_ident, #ty_tokens, #setter_name_ident, #setter_ty_tokens, #field_name_str);
+            }
+        } else {
+            quote! {
+                __wsdom_load_ts_macro::expand_field_getter_setter!(browser @ #getter_name_ident, #ty_tokens, #setter_name_ident, #setter_ty_tokens, #field_name_str, #interface_name);
+            }
         })
+
+        // let getter = {
+        //     if on_instance {
+        //         quote! {
+        //             pub fn #getter_name_ident (&self) -> #ty_tokens {
+        //                 __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+        //                     __wsdom_load_ts_macro::JsObject::js_get_field(self.as_ref(), &#field_name_str)
+        //                 )
+        //             }
+        //         }
+        //     } else {
+        //         quote! {
+        //             pub fn #getter_name_ident (browser: &__wsdom_load_ts_macro::Browser) -> #ty_tokens {
+        //                 __wsdom_load_ts_macro::JsCast::unchecked_from_js(
+        //                     browser.get_field(&__wsdom_load_ts_macro::RawCodeImmediate( #interface_name ), &#field_name_str)
+        //                 )
+        //             }
+        //         }
+        //     }
+        // };
+        // let setter = (!field.readonly).then(|| {
+        //             let ty_tokens = if self.classes.contains(ty_name) {
+        //                 quote! {& #ty_tokens}
+        //             }
+        //             else {
+        //                 quote! {&dyn __wsdom_load_ts_macro::ToJs< #ty_tokens >}
+        //             };
+        //             if on_instance {
+        //                 quote!{
+        //                     pub fn #setter_name_ident (&self, value: #ty_tokens) {
+        //                         __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, __wsdom_load_ts_macro::UpcastWorkaround::new(value).cast())
+        //                     }
+        //                 }
+        //             }
+        //             else {
+        //                 quote!{
+        //                     pub fn #setter_name_ident (browser: &__wsdom_load_ts_macro::Browser, value: #ty_tokens) {
+        //                         browser.set_field(&__wsdom_load_ts_macro::RawCodeImmediate( #interface_name ), &#field_name_str, value)
+        //                     }
+        //                 }
+        //             }
+        //         });
+        // Some(quote! {
+        //     #getter
+        //     #setter
+        // })
     }
     fn make_getter_code(
         &self,
