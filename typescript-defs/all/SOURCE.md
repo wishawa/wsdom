@@ -1,0 +1,1 @@
+You can get the TypeScript definitions for the browser DOM [here](https://github.com/microsoft/TypeScript/tree/main/src/lib).
