@@ -2,31 +2,37 @@ type Id = number;
 type Value = unknown;
 type SendMessage = (msg: string) => void;
 
-function startWebSocketWRMI(wsUrl: string | URL, wsProtocols?: string | string[]) {
+function WSDOMStartWebSocket(wsUrl: string | URL, wsProtocols?: string | string[]) {
 	const ws = new WebSocket(wsUrl, wsProtocols);
-	const wsdom = new WRMI((msg: string) => {
+	const wsdom = new WSDOM((msg: string) => {
 		ws.send(msg);
 	});
 	ws.onopen = () => {
-		console.debug("WRMI WS connection open!");
+		console.debug("WSDOM WebSocket connection open!");
 		console.debug("WebSocket object", ws);
-		console.debug("WRMI object", wsdom);
+		console.debug("WSDOM object", wsdom);
 	}
 	ws.onmessage = (msg: MessageEvent<string>) => {
 		wsdom.handleIncomingMessage(msg.data);
 	};
+	ws.onclose = (ev: CloseEvent) => {
+		console.debug("WSDOM WebSocket closed", ev);
+	}
+	ws.onerror = (ev: Event) => {
+		console.warn("WSDOM WebSocket errored", ev);
+	}
 }
-class WRMI {
-	private internal: WRMIInternal;
+class WSDOM {
+	private internal: WSDOMInternal;
 	constructor(sendMessage: SendMessage) {
-		this.internal = new WRMIInternal(sendMessage);
+		this.internal = new WSDOMInternal(sendMessage);
 	}
 	public handleIncomingMessage(msg: string) {
 		const fn = new Function('_w', msg);
 		fn(this.internal);
 	}
 }
-class WRMIInternal {
+class WSDOMInternal {
 	private sender: SendMessage;
 	private values: Map<Id, Value>;
 	constructor(sender: SendMessage) {

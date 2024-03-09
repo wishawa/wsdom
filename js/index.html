@@ -6,30 +6,36 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Document</title>
 	<script>
-		function startWebSocketWRMI(wsUrl, wsProtocols) {
+		function WSDOMStartWebSocket(wsUrl, wsProtocols) {
 			const ws = new WebSocket(wsUrl, wsProtocols);
-			const wsdom = new WRMI((msg) => {
+			const wsdom = new WSDOM((msg) => {
 				ws.send(msg);
 			});
 			ws.onopen = () => {
-				console.debug("WRMI WS connection open!");
+				console.debug("WSDOM WebSocket connection open!");
 				console.debug("WebSocket object", ws);
-				console.debug("WRMI object", wsdom);
+				console.debug("WSDOM object", wsdom);
 			};
 			ws.onmessage = (msg) => {
 				wsdom.handleIncomingMessage(msg.data);
 			};
+			ws.onclose = (ev) => {
+				console.debug("WSDOM WebSocket closed", ev);
+			};
+			ws.onerror = (ev) => {
+				console.warn("WSDOM WebSocket errored", ev);
+			};
 		}
-		class WRMI {
+		class WSDOM {
 			constructor(sendMessage) {
-				this.internal = new WRMIInternal(sendMessage);
+				this.internal = new WSDOMInternal(sendMessage);
 			}
 			handleIncomingMessage(msg) {
 				const fn = new Function('_w', msg);
 				fn(this.internal);
 			}
 		}
-		class WRMIInternal {
+		class WSDOMInternal {
 			constructor(sender) {
 				this.g = (id) => {
 					return this.values.get(id);
@@ -48,7 +54,6 @@
 				this.values = new Map();
 			}
 		}
-
 		startWebSocketWRMI("ws://localhost:3000/ws");
 	</script>
 </head>
