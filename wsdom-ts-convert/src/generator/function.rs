@@ -19,7 +19,7 @@ impl<'a> Context<'a> {
             pub fn #function_name_ident #function_generics (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
                 __wsdom_load_ts_macro::JsCast::unchecked_from_js(
                     browser.call_function(#function, [
-                        #( #arg_names_body as &dyn __wsdom_load_ts_macro::UseInJsCode,)*
+                        #(  __wsdom_load_ts_macro::UpcastWorkaround::new(#arg_names_body).cast(), )*
                     ], #last_arg_variadic)
                 )
             }

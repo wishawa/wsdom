@@ -275,7 +275,7 @@ impl<'a> Context<'a> {
                 pub fn #method_name_ident #method_generics (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {
                     __wsdom_load_ts_macro::JsCast::unchecked_from_js(
                         __wsdom_load_ts_macro::JsObject::js_call_method(self.as_ref(), #method_name_str, [
-                            #( #arg_names_body as &dyn __wsdom_load_ts_macro::UseInJsCode, )*
+                            #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
                         ], #last_arg_variadic)
                     )
                 }
@@ -286,7 +286,7 @@ impl<'a> Context<'a> {
                     pub fn #method_name_ident (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
                         __wsdom_load_ts_macro::JsCast::unchecked_from_js(
                             browser.call_constructor(#interface_name, [
-                                #( #arg_names_body as &dyn __wsdom_load_ts_macro::UseInJsCode,)*
+                                #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
                             ], #last_arg_variadic)
                         )
                     }
@@ -297,7 +297,7 @@ impl<'a> Context<'a> {
                     pub fn #method_name_ident #method_generics (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
                         __wsdom_load_ts_macro::JsCast::unchecked_from_js(
                             browser.call_function(#function, [
-                                #( #arg_names_body as &dyn __wsdom_load_ts_macro::UseInJsCode,)*
+                                #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
                             ], #last_arg_variadic)
                         )
                     }
@@ -356,7 +356,7 @@ impl<'a> Context<'a> {
                     if on_instance {
                         quote!{
                             pub fn #setter_name_ident (&self, value: #ty_tokens) {
-                                __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, value)
+                                __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, __wsdom_load_ts_macro::UpcastWorkaround::new(value).cast())
                             }
                         }
                     }
@@ -415,7 +415,7 @@ impl<'a> Context<'a> {
 
         Some(quote! {
             pub fn #setter_name_ident (&self, value: #ty_tokens) {
-                __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, value as &dyn __wsdom_load_ts_macro::UseInJsCode)
+                __wsdom_load_ts_macro::JsObject::js_set_field(self.as_ref(), &#field_name_str, __wsdom_load_ts_macro::UpcastWorkaround::new( value ).cast() )
             }
         })
     }
