@@ -1,45 +1,76 @@
 use std::{
     collections::HashMap,
-    error::Error,
     sync::{Arc, Mutex},
     task::{Poll, Waker},
 };
 
-/// A WRMI client.
+/// A WSDOM client.
 ///
-/// You can use this to call JS functions on the client.
+/// You can use this to call JS functions on the JS client (the web browser).
 /// Every JsValue holds a Browser object which they internally use for calling methods, etc.
 ///
 /// Browser uses Arc internally, so cloning is cheap and a cloned Browser points to the same client.
+///
+/// ## Use with Integration Library
+///
+/// You can obtain Browser from the WSDOM integration library (for example, `wsdom-axum`).
+///
+/// ## Manual Usage
+///
+/// If there is no WSDOM integration library for your framework,
+/// you can instead create Browser manually with the `new()` method.
+///
+/// Manually created Browsers need to be "driven"
+/// -   Browser implements the [Stream][futures_core::Stream] trait with [String].
+///     You must take items from the stream and send it to the WSDOM JS client
+///     over WebSocket or other transport of your choice.
+/// -   Browser has a `receive_incoming_message(msg: String)` method.
+///     Everything sent by the WSDOM JS client must be fed into this method.
+///
+/// The `counter-manual` example in our repo shows manual usage with Tokio.
 #[derive(Clone, Debug)]
 pub struct Browser(pub(crate) Arc<Mutex<BrowserInternal>>);
 
 impl Browser {
+    /// Create a new Browser object.
+    ///
+    /// This is only needed if you intend to go the "manual" route described above.
     pub fn new() -> Self {
         let link = BrowserInternal {
             retrievals: HashMap::new(),
             last_id: 1,
             commands_buf: String::new(),
             outgoing_waker: None,
-            dead: None,
+            dead: ErrorState::NoError,
         };
         Self(Arc::new(Mutex::new(link)))
     }
+    /// Receive a message sent from the WSDOM JS client.
+    ///
+    /// This is only needed if you intend to go the "manual" route described above.
+    /// If you use an integration library, messages are handled automatically.
     pub fn receive_incoming_message(&self, message: String) {
         self.0.lock().unwrap().receive(message);
     }
-    pub fn get_outgoing_stream(&self) -> OutgoingMessages {
-        OutgoingMessages {
-            link: self.0.clone(),
+    /// If the Browser has errored, this will return the error.
+    ///
+    /// The [Error] type is not [Clone], so after the first call returning `Some(_)`,
+    /// this method will return `None`.
+    pub fn take_error(&self) -> Option<Error> {
+        let mut link = self.0.lock().unwrap();
+        match std::mem::replace(&mut link.dead, ErrorState::ErrorTaken) {
+            ErrorState::NoError => {
+                link.dead = ErrorState::NoError;
+                None
+            }
+            ErrorState::Error(e) => Some(e),
+            ErrorState::ErrorTaken => None,
         }
     }
 }
 
-pub struct OutgoingMessages {
-    link: Arc<Mutex<BrowserInternal>>,
-}
-
-impl futures_core::Stream for OutgoingMessages {
+/// The stream of messages that should be sent over WebSocket (or your transport of choice) to the JavaScript WSDOM client.
+impl futures_core::Stream for Browser {
     type Item = String;
 
     fn poll_next(
@@ -47,9 +78,9 @@ impl futures_core::Stream for OutgoingMessages {
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
-        let mut link = this.link.lock().unwrap();
+        let mut link = this.0.lock().unwrap();
 
-        if link.dead.is_some() {
+        if !matches!(&link.dead, ErrorState::NoError) {
             return Poll::Ready(None);
         }
 
@@ -57,7 +88,7 @@ impl futures_core::Stream for OutgoingMessages {
         if !link
             .outgoing_waker
             .as_ref()
-            .is_some_and(|w| w.will_wake(new_waker))
+            .is_some_and(|w| new_waker.will_wake(w))
         {
             link.outgoing_waker = Some(new_waker.to_owned());
         }
@@ -75,7 +106,22 @@ pub struct BrowserInternal {
     last_id: u64,
     commands_buf: String,
     outgoing_waker: Option<Waker>,
-    dead: Option<Box<dyn Error + Send>>,
+    dead: ErrorState,
+}
+
+/// Error that could happen in WSDOM.
+///
+/// Currently, the only errors that could happen are from [serde] serialization and deserialization.
+#[derive(Debug)]
+pub enum Error {
+    CommandSerialize(std::fmt::Error),
+    DataDeserialize(serde_json::Error),
+}
+#[derive(Debug)]
+enum ErrorState {
+    NoError,
+    Error(Error),
+    ErrorTaken,
 }
 
 #[derive(Debug)]
@@ -109,9 +155,9 @@ impl BrowserInternal {
         self.last_id += 1;
         self.last_id
     }
-    pub(crate) fn kill(&mut self, err: Box<dyn Error + Send>) {
-        if self.dead.is_none() {
-            self.dead = Some(err);
+    pub(crate) fn kill(&mut self, err: Error) {
+        if matches!(self.dead, ErrorState::NoError) {
+            self.dead = ErrorState::Error(err);
         }
     }
     pub(crate) fn wake_outgoing(&mut self) {

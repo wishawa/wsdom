@@ -69,7 +69,8 @@ impl<'a> UseInJsCode for RawCodeImmediate<'a> {
 pub trait ToJs<JsType>
 where
     Self: UseInJsCode,
+    JsType: ?Sized,
 {
 }
 
-impl<T> ToJs<T> for T where T: UseInJsCode {}
+impl<T: ?Sized> ToJs<T> for T where T: UseInJsCode {}

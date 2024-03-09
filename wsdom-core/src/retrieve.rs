@@ -4,9 +4,10 @@ use std::{fmt::Write, future::Future, pin::Pin, task::Poll};
 
 use serde::de::DeserializeOwned;
 
-use crate::link::{BrowserInternal, RetrievalState};
+use crate::link::{BrowserInternal, Error, RetrievalState};
 use crate::protocol::{GET, REP};
 
+/// A [Future] for retrieving value from the JS side to the Rust side.
 pub struct RetrieveFuture<'a, T: DeserializeOwned> {
     pub(crate) id: u64,
     pub(crate) ret_id: u64,
@@ -68,7 +69,7 @@ impl<'a, T: DeserializeOwned> Future for RetrieveFuture<'a, T> {
                                 Poll::Ready(v)
                             }
                             Err(e) => {
-                                link.kill(Box::new(e));
+                                link.kill(Error::DataDeserialize(e));
                                 Poll::Pending
                             }
                         }

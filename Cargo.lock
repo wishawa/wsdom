@@ -161,6 +161,18 @@ dependencies = [
  "futures-util",
  "tokio",
  "wsdom",
+ "wsdom-axum",
+]
+
+[[package]]
+name = "counter-manual"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "tokio",
+ "wsdom",
+ "wsdom-axum",
 ]
 
 [[package]]
@@ -784,6 +796,7 @@ dependencies = [
  "futures-util",
  "tokio",
  "wsdom",
+ "wsdom-axum",
 ]
 
 [[package]]
@@ -1128,6 +1141,16 @@ dependencies = [
  "wsdom-javascript",
  "wsdom-macros",
  "wsdom-macros-decl",
+]
+
+[[package]]
+name = "wsdom-axum"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "pin-project-lite",
+ "wsdom-core",
 ]
 
 [[package]]

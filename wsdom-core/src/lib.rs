@@ -8,7 +8,8 @@ mod protocol;
 mod retrieve;
 mod serialize;
 
-pub use link::Browser;
+pub use link::{Browser, Error};
+
 pub mod js_types {
     pub use super::js::{
         immediates::NullImmediate,
