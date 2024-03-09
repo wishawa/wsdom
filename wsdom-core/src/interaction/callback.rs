@@ -4,7 +4,7 @@ use crate::{
     js::value::JsValue,
     js_cast::JsCast,
     link::{Browser, RetrievalState},
-    protocol::{GET, REP, SET},
+    protocol::{DEL, GET, REP, SET},
 };
 
 pub struct Callback<E> {
@@ -68,6 +68,8 @@ impl<E> Drop for Callback<E> {
         let mut link = self.browser.0.lock().unwrap();
         let ret_id = self.ret_id;
         link.retrievals.remove(&ret_id);
+        let arr_id = self.arr_id;
+        writeln!(link.raw_commands_buf(), "{DEL}({arr_id});").unwrap();
     }
 }
 
