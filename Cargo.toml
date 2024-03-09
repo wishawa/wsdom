@@ -10,6 +10,7 @@ members = [
 	"integrations/wsdom-axum/",
 	"examples/simple/",
 	"examples/counter/",
-	"examples/counter-manual/"
+	"examples/counter-manual/",
+	"examples/audio"
 ]
 resolver = "2"

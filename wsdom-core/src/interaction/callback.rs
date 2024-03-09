@@ -7,6 +7,12 @@ use crate::{
     protocol::{DEL, GET, REP, SET},
 };
 
+/// Listens for JavaScript callbacks.
+///
+/// This implements the [Stream][futures_core::Stream] trait;
+/// the stream yields callback events.
+///
+/// The [new_callback] function creates a Callback; go see how it is used.
 pub struct Callback<E> {
     arr_id: u64,
     ret_id: u64,
@@ -73,6 +79,21 @@ impl<E> Drop for Callback<E> {
     }
 }
 
+/// Create a new Callback and a corresponding JavaScript function.
+///
+/// The returned Callback object is a stream. Every time the returned function is called,
+/// the stream will yield the call argument as value.
+///
+/// ```rust
+/// # use wsdom_core::Browser;
+/// async fn example(browser: &Browser, button: wsdom::dom::HTMLButtonElement) {
+///     let (mut callback, func) = wsdom::callback::new_callback::<wsdom::dom::MouseEvent>(&browser);
+///     button.add_event_listener(&"click", &func, &wsdom::null());
+///     use futures_util::StreamExt;
+///     callback.next().await;
+///     println!("the button was clicked!");
+/// }
+/// ```
 pub fn new_callback<E>(browser: &Browser) -> (Callback<E>, JsValue) {
     let mut link = browser.0.lock().unwrap();
     let arr_id = link.get_new_id();

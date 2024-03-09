@@ -87,22 +87,27 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
             continue;
         };
 
-        let constructor_ty = decl_members.iter().find_map(|member| match &member.data {
-            Member::Method(Method {
-                name: MethodName::Constructor,
-                ret:
-                    TsType::Named {
-                        ty: NamedType { name, .. },
-                    },
-                ..
-            }) => Some(name),
+        let constructor = decl_members.iter().find_map(|member| match &member.data {
+            Member::Method(
+                method @ Method {
+                    name: MethodName::Constructor,
+                    ret:
+                        TsType::Named {
+                            ty: NamedType { name, .. },
+                        },
+                    ..
+                },
+            ) => Some((method, name)),
             _ => None,
         });
-        if constructor_ty.is_some_and(|t| t != name) {
-            continue;
+        if let Some((method, ret_name)) = constructor {
+            if ret_name != name {
+                generated_code.push(ctx.make_custom_constructor(name, &method.args, &method.ret));
+                continue;
+            }
         }
-        let iface = constructor_ty
-            .and_then(|s| ctx.interfaces.get(s))
+        let iface = constructor
+            .and_then(|(_, s)| ctx.interfaces.get(s))
             .or_else(|| direct_decl.then(|| ctx.interfaces.get(name)).flatten())
             .map(Cow::Borrowed)
             .unwrap_or_else(|| {

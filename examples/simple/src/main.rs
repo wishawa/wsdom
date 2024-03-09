@@ -1,5 +1,5 @@
 use axum::{extract::ws::WebSocketUpgrade, response::Response, routing::get, Router};
-use wsdom::{js_types::NullImmediate, Browser};
+use wsdom::Browser;
 
 #[tokio::main]
 async fn main() {
@@ -18,7 +18,7 @@ async fn handler(ws: WebSocketUpgrade) -> Response {
 async fn app(browser: Browser) {
     let document = wsdom::dom::document(&browser);
     let body = document.get_body();
-    let elem = document.create_element(&"div", &NullImmediate);
+    let elem = document.create_element(&"div", &wsdom::null());
     elem.set_inner_text(&"Hello World!");
     body.append_child(&elem);
 }

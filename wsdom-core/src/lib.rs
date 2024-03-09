@@ -12,7 +12,6 @@ pub use link::{Browser, Error};
 
 pub mod js_types {
     pub use super::js::{
-        immediates::NullImmediate,
         nullable::{JsNullable, JsNullish},
         object::JsObject,
         primitives::*,
@@ -22,7 +21,11 @@ pub mod js_types {
 pub use interaction::callback;
 pub use js_cast::JsCast;
 pub use serialize::{ToJs, UseInJsCode};
+pub mod immediates {
+    pub use super::js::immediates::null;
+}
 
+#[doc(hidden)]
 pub mod for_macro {
     pub use super::internal::upcast_workaround::UpcastWorkaround;
     pub use super::link::BrowserInternal;

@@ -2,4 +2,4 @@ mod array;
 mod nullable;
 mod primitives;
 
-pub use nullable::NullImmediate;
+pub use nullable::null;

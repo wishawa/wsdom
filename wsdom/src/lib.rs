@@ -13,6 +13,7 @@ pub mod __wsdom_load_ts_macro {
 }
 
 pub use wsdom_core::callback;
+pub use wsdom_core::immediates::*;
 pub use wsdom_core::{js_types, Browser, JsCast, ToJs};
 pub use wsdom_dom as dom;
 pub use wsdom_javascript as js;

@@ -15,6 +15,10 @@ impl UseInJsCode for NullImmediate {
 impl ToJs<JsNullish> for NullImmediate {}
 impl<T> ToJs<JsNullable<T>> for NullImmediate {}
 
+pub fn null() -> NullImmediate {
+    NullImmediate
+}
+
 impl<'a, T: UseInJsCode> UseInJsCode for Option<&'a T> {
     fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

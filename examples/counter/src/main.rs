@@ -1,9 +1,6 @@
 use axum::{extract::ws::WebSocketUpgrade, response::Response, routing::get, Router};
 use futures_util::StreamExt;
-use wsdom::{
-    js_types::{JsValue, NullImmediate},
-    Browser,
-};
+use wsdom::{js_types::JsValue, Browser};
 
 #[tokio::main]
 async fn main() {
@@ -23,11 +20,11 @@ async fn app(browser: Browser) {
     // create the UI
     let document = wsdom::dom::document(&browser);
     let body = document.get_body();
-    let btn_add = document.create_element(&"button", &NullImmediate);
+    let btn_add = document.create_element(&"button", &wsdom::null());
     btn_add.set_inner_text(&"+");
-    let btn_sub = document.create_element(&"button", &NullImmediate);
+    let btn_sub = document.create_element(&"button", &wsdom::null());
     btn_sub.set_inner_text(&"-");
-    let label = document.create_element(&"span", &NullImmediate);
+    let label = document.create_element(&"span", &wsdom::null());
     body.append_child(&btn_sub);
     body.append_child(&label);
     body.append_child(&btn_add);
@@ -38,12 +35,12 @@ async fn app(browser: Browser) {
     // set up the click listeners
     let mut click_add_stream = {
         let (callback, func) = wsdom::callback::new_callback::<JsValue>(&browser);
-        btn_add.add_event_listener(&"click", &func, &NullImmediate);
+        btn_add.add_event_listener(&"click", &func, &wsdom::null());
         callback
     };
     let mut click_sub_stream = {
         let (callback, func) = wsdom::callback::new_callback::<JsValue>(&browser);
-        btn_sub.add_event_listener(&"click", &func, &NullImmediate);
+        btn_sub.add_event_listener(&"click", &func, &wsdom::null());
         callback
     };
 

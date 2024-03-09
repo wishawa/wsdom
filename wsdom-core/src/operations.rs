@@ -266,10 +266,10 @@ impl JsObject {
     /// fn example(browser: &Browser) {
     ///     let console = wsdom::dom::console(browser);
     ///     // you can call console.log like this
-    ///     console.js_call_method("log", [&"hello"], false);
+    ///     console.js_call_method("log", [&"hello" as &_], false);
     ///     
     ///     // but the better way is to use
-    ///     wsdom::dom::console(&browser).log(&[&"Hello"]);
+    ///     wsdom::dom::console(&browser).log(&[&"Hello" as &_]);
     /// }
     /// ```
     ///
