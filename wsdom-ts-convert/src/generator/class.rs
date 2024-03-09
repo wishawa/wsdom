@@ -30,12 +30,12 @@ impl<'a> Context<'a> {
         let name = new_ident_safe(interface.name);
 
         let (
-            generics_with_bound,
-            generics_without_bound,
-            generics_with_default,
+            generics_with_bounds,
+            generics_without_bounds,
+            generics_with_defaults,
             generics_for_phantom,
         ) = if interface.generics.args.is_empty() {
-            (None, None, None, quote! {<()>})
+            (None, None, None, quote! {()})
         } else {
             let with_bounds_with_defaults = interface.generics.args.iter().map(|arg| {
                 let name = new_ident_safe(arg.name);
@@ -78,14 +78,8 @@ impl<'a> Context<'a> {
                 Some(quote! { <#(#with_bounds,)*> }),
                 Some(quote! { <#without_bounds_tokens> }),
                 Some(quote! { <#(#with_defaults,)*> }),
-                quote! {<(#without_bounds_tokens)>},
+                quote! {(#without_bounds_tokens)},
             )
-        };
-
-        let tokens = quote! {
-            #[derive(::core::clone::Clone, __wsdom_load_ts_macro::RefCast)]
-            #[repr(transparent)]
-            pub struct #name #generics_with_default (__wsdom_load_ts_macro::JsValue, ::core::marker::PhantomData #generics_for_phantom );
         };
 
         let mut ancestors = Vec::new();
@@ -116,48 +110,17 @@ impl<'a> Context<'a> {
 
         let extends = ancestors.into_iter().map(|anc| self.convert_type(anc));
 
+        // let generics_with_bounds_iter = generics_with_bounds.as_ref().into_iter();
         let tokens = quote! {
-            #tokens
-
-            impl #generics_with_bound __wsdom_load_ts_macro::JsCast for #name #generics_without_bound {
-                fn unchecked_from_js(val: __wsdom_load_ts_macro::JsValue) -> Self {
-                    Self(val, ::core::marker::PhantomData)
-                }
-                fn unchecked_from_js_ref(val: &__wsdom_load_ts_macro::JsValue) -> &Self {
-                    __wsdom_load_ts_macro::RefCast::ref_cast(val)
-                }
-            }
-            impl #generics_with_bound __wsdom_load_ts_macro::UseInJsCode for #name #generics_without_bound {
-                fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    self.0.serialize_to(buf)
-                }
-            }
-
-            impl #generics_with_bound ::core::convert::AsRef<Self> for #name #generics_without_bound {
-                fn as_ref(&self) -> &Self {
-                    self
-                }
-            }
-
-            #(
-                impl #generics_with_bound ::core::convert::AsRef<#extends> for #name #generics_without_bound {
-                    fn as_ref(&self) -> &#extends {
-                        __wsdom_load_ts_macro::JsCast::unchecked_from_js_ref(&self.0)
-                    }
-                }
-                impl #generics_with_bound ::core::convert::Into<#extends> for #name #generics_without_bound {
-                    fn into(self) -> #extends {
-                        __wsdom_load_ts_macro::JsCast::unchecked_from_js(self.0)
-                    }
-                }
-            )*
-
-            impl #generics_with_bound std::ops::Deref for #name #generics_without_bound {
-                type Target = #first_extend;
-                fn deref(&self) -> &Self::Target {
-                    self.as_ref()
-                }
-            }
+            __wsdom_load_ts_macro::expand_class_def!(
+                #generics_for_phantom,
+                [#generics_with_bounds],
+                #name #generics_without_bounds,
+                #name,
+                [#generics_with_defaults],
+                #first_extend,
+                #(#extends,)*
+            );
         };
 
         let tokens = {
@@ -229,9 +192,10 @@ impl<'a> Context<'a> {
                     member_tokens.push(self.make_setter_code(interface.name, setter, on_instance));
                 }
             }
+
             quote! {
                 #tokens
-                impl #generics_with_bound #name #generics_without_bound {
+                impl #generics_with_bounds #name #generics_without_bounds {
                     #(
                         #member_tokens
                     )*

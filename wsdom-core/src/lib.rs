@@ -1,4 +1,5 @@
 mod interaction;
+mod internal;
 mod js;
 mod js_cast;
 mod link;
@@ -6,7 +7,6 @@ mod operations;
 mod protocol;
 mod retrieve;
 mod serialize;
-mod upcast_workaround;
 
 pub use link::Browser;
 pub mod js_types {
@@ -22,8 +22,8 @@ pub use interaction::callback;
 pub use js_cast::JsCast;
 pub use serialize::{ToJs, UseInJsCode};
 
-pub mod advanced {
+pub mod for_macro {
+    pub use super::internal::upcast_workaround::UpcastWorkaround;
     pub use super::link::BrowserInternal;
     pub use super::serialize::RawCodeImmediate;
-    pub use super::upcast_workaround::UpcastWorkaround;
 }

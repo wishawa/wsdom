@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 wsdom-macros = { path = "../wsdom-macros/" }
+wsdom-macros-decl = { path = "../wsdom-macros-decl/" }
 wsdom-core = { path = "../wsdom-core/" }
 wsdom-javascript = { path = "../wsdom-javascript/" }
 wsdom-dom = { path = "../wsdom-dom/" }

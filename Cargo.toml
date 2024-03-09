@@ -2,6 +2,7 @@
 members = [
 	"wsdom-core/",
 	"wsdom-macros/",
+	"wsdom-macros-decl",
 	"wsdom-ts-convert/",
 	"wsdom/",
 	"wsdom-javascript/",

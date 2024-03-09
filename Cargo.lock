@@ -1127,6 +1127,7 @@ dependencies = [
  "wsdom-dom",
  "wsdom-javascript",
  "wsdom-macros",
+ "wsdom-macros-decl",
 ]
 
 [[package]]
@@ -1158,6 +1159,7 @@ dependencies = [
  "serde",
  "wsdom-core",
  "wsdom-macros",
+ "wsdom-macros-decl",
 ]
 
 [[package]]
@@ -1169,6 +1171,10 @@ dependencies = [
  "syn",
  "wsdom-ts-convert",
 ]
+
+[[package]]
+name = "wsdom-macros-decl"
+version = "0.1.0"
 
 [[package]]
 name = "wsdom-ts-convert"
