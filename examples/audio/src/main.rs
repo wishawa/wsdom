@@ -23,6 +23,8 @@ async fn app(browser: Browser) {
     let btn = document.create_element(&"button", &wsdom::null());
     btn.set_inner_text(&"play t-rex sound (make sure you don't have autoplay blocked)");
     body.append_child(&btn);
+
+    // make an audio
     let audio = wsdom::dom::Audio(
         &browser,
         &Some(&"https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"),

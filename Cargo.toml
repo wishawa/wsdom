@@ -11,6 +11,7 @@ members = [
 	"examples/simple/",
 	"examples/counter/",
 	"examples/counter-manual/",
-	"examples/audio"
+	"examples/audio",
+	"examples/computation"
 ]
 resolver = "2"
