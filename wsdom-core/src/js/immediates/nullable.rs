@@ -15,8 +15,21 @@ impl UseInJsCode for NullImmediate {
 impl ToJs<JsNullish> for NullImmediate {}
 impl<T> ToJs<JsNullable<T>> for NullImmediate {}
 
-pub fn null() -> NullImmediate {
+pub struct UndefinedImmediate;
+impl UseInJsCode for UndefinedImmediate {
+    fn serialize_to(&self, buf: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        RawCodeImmediate("undefined").serialize_to(buf)
+    }
+}
+
+impl ToJs<JsNullish> for UndefinedImmediate {}
+impl<T> ToJs<JsNullable<T>> for UndefinedImmediate {}
+
+pub const fn null() -> NullImmediate {
     NullImmediate
+}
+pub const fn undefined() -> UndefinedImmediate {
+    UndefinedImmediate
 }
 
 impl<'a, T: UseInJsCode> UseInJsCode for Option<&'a T> {

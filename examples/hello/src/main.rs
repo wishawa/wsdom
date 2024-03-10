@@ -18,7 +18,7 @@ async fn handler(ws: WebSocketUpgrade) -> Response {
 async fn app(browser: Browser) {
     let document = wsdom::dom::document(&browser);
     let body = document.get_body();
-    let elem = document.create_element(&"div", &wsdom::null());
+    let elem = document.create_element(&"div", &wsdom::undefined());
     elem.set_inner_text(&"Hello World!");
     body.append_child(&elem);
 }

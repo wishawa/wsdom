@@ -2,7 +2,7 @@ type Id = number;
 type Value = unknown;
 type SendMessage = (msg: string) => void;
 
-function WSDOMStartWebSocket(wsUrl: string | URL, wsProtocols?: string | string[]) {
+function WSDOMConnectWebSocket(wsUrl: string | URL, wsProtocols?: string | string[]) {
 	const ws = new WebSocket(wsUrl, wsProtocols);
 	const wsdom = new WSDOM((msg: string) => {
 		ws.send(msg);

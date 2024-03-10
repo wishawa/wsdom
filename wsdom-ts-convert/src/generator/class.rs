@@ -167,7 +167,21 @@ impl<'a> Context<'a> {
                             if (name.starts_with("set") || name.starts_with("get"))
                                 && name.chars().nth(3).is_some_and(|c| c.is_ascii_uppercase()) =>
                         {
-                            true
+                            fields
+                                .clone()
+                                .find(|field| match field.0.name {
+                                    FieldName::Name(field_name)
+                                        if name.chars().skip(3).zip(field_name.chars()).all(
+                                            |(c1, c2)| {
+                                                c1.to_ascii_lowercase() == c2.to_ascii_lowercase()
+                                            },
+                                        ) =>
+                                    {
+                                        true
+                                    }
+                                    _ => false,
+                                })
+                                .is_some()
                         }
                         _ => false,
                     };

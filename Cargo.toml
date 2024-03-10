@@ -8,10 +8,11 @@ members = [
 	"wsdom-javascript/",
 	"wsdom-dom/",
 	"integrations/wsdom-axum/",
-	"examples/simple/",
+	"examples/hello/",
 	"examples/counter/",
 	"examples/counter-manual/",
-	"examples/audio",
-	"examples/computation"
+	"examples/audio/",
+	"examples/computation/",
+	"examples/canvas/"
 ]
 resolver = "2"

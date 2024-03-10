@@ -6,7 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Document</title>
 	<script>
-		function WSDOMStartWebSocket(wsUrl, wsProtocols) {
+		function WSDOMConnectWebSocket(wsUrl, wsProtocols) {
 			const ws = new WebSocket(wsUrl, wsProtocols);
 			const wsdom = new WSDOM((msg) => {
 				ws.send(msg);
@@ -54,7 +54,7 @@
 				this.values = new Map();
 			}
 		}
-		WSDOMStartWebSocket("ws://localhost:3000/ws");
+		WSDOMConnectWebSocket("ws://localhost:3000/ws");
 	</script>
 </head>
 

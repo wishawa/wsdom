@@ -22,7 +22,7 @@ pub use interaction::callback;
 pub use js_cast::JsCast;
 pub use serialize::{ToJs, UseInJsCode};
 pub mod immediates {
-    pub use super::js::immediates::null;
+    pub use super::js::immediates::{null, undefined};
 }
 
 #[doc(hidden)]
