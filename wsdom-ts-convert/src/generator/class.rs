@@ -1,17 +1,17 @@
+use std::collections::HashSet;
+
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::{
-    generator::{
-        types::SimplifiedType,
-        util::{iter_dedupe_all, iter_dedupe_consecutive},
-    },
+    generator::{types::SimplifiedType, util::iter_dedupe_all},
     parser::{
         comment::WithComment,
         field::{Field, FieldName},
         interface::Interface,
         member::{Getter, Member, Setter},
         method::{Method, MethodName},
+        ts_type::{NamedType, TsType},
     },
 };
 
@@ -22,6 +22,21 @@ use super::{
 };
 
 impl<'a> Context<'a> {
+    pub(super) fn get_members<'b>(
+        &'b self,
+        ty: &'b TsType<'b>,
+    ) -> Option<(&'b Vec<WithComment<'b, Member<'b>>>, bool)> {
+        match ty {
+            TsType::Named {
+                ty: NamedType { name, .. },
+            } => self
+                .interfaces
+                .get(name)
+                .map(|interface| (&interface.members, true)),
+            TsType::Interface { members } => Some((members, false)),
+            _ => None,
+        }
+    }
     pub(super) fn make_class(
         &self,
         interface: &Interface<'_>,
@@ -100,14 +115,16 @@ impl<'a> Context<'a> {
         ancestors.sort_by_key(|item| item.name);
         ancestors.dedup_by_key(|item| item.name);
 
-        let first_extend = self.convert_type(
-            interface
-                .extends
-                .first()
-                .map(|ty| self.simplify_type(ty.to_owned()))
-                .unwrap_or(known_types::OBJECT),
+        let superclass = interface.extends.iter().find_map(|iface| {
+            let parent = self.simplify_type(iface.to_owned());
+            self.classes.contains(parent.name).then_some(parent)
+        });
+        let superclass_token = self.convert_type(
+            superclass
+                .as_ref()
+                .unwrap_or(&known_types::OBJECT)
+                .to_owned(),
         );
-
         let extends = ancestors.into_iter().map(|anc| self.convert_type(anc));
 
         let tokens = quote! {
@@ -117,7 +134,7 @@ impl<'a> Context<'a> {
                 #name #generics_without_bounds,
                 #name,
                 [#generics_with_defaults],
-                #first_extend,
+                #superclass_token,
                 #(#extends,)*
             );
         };
@@ -127,7 +144,36 @@ impl<'a> Context<'a> {
             let all_members = decl_members
                 .iter()
                 .map(|member| (member, false))
-                .chain(interface.members.iter().map(|member| (member, true)));
+                .chain(interface.members.iter().map(|member| (member, true)))
+                .chain(
+                    interface
+                        .extends
+                        .iter()
+                        .filter(|iface| {
+                            !self
+                                .classes
+                                .contains(self.simplify_type((*iface).to_owned()).name)
+                        })
+                        .filter(|iface| {
+                            // TODO: this is a hack to filter out generics because I'm too lazy to implement substitution
+                            match iface {
+                                TsType::Named { ty } => self
+                                    .interfaces
+                                    .get(ty.name)
+                                    .is_some_and(|iface| iface.generics.args.is_empty()),
+                                _ => true,
+                            }
+                        })
+                        .flat_map(|iface| {
+                            self.get_members(iface)
+                                .into_iter()
+                                .filter_map(|(members, on_instance)| {
+                                    on_instance
+                                        .then_some(members.iter().map(|member| (member, true)))
+                                })
+                                .flatten()
+                        }),
+                );
 
             let methods =
                 all_members
@@ -158,10 +204,12 @@ impl<'a> Context<'a> {
                         _ => None,
                     });
             {
-                let methods = iter_dedupe_consecutive(methods, |(m, _)| (&m.name, m.args.len()));
+                let mut methods = iter_dedupe_all(methods.rev(), |(m, _)| (&m.name, m.args.len()))
+                    .collect::<Vec<_>>();
+                methods.sort_unstable_by_key(|(m, _)| m.args.len());
+                let mut generated_methods = HashSet::new();
 
-                let mut last_method_name = MethodName::Name("");
-                for (method, on_instance) in methods {
+                for (method, on_instance) in methods.into_iter() {
                     let field_name_conflict = match method.name {
                         MethodName::Name(name)
                             if (name.starts_with("set") || name.starts_with("get"))
@@ -185,8 +233,7 @@ impl<'a> Context<'a> {
                         }
                         _ => false,
                     };
-                    let is_overload = method.name == last_method_name;
-                    last_method_name = method.name.clone();
+                    let is_overload = generated_methods.contains(&method.name);
                     member_tokens.push(self.make_method_code(
                         interface.name,
                         method,
@@ -194,10 +241,11 @@ impl<'a> Context<'a> {
                         is_overload,
                         field_name_conflict,
                     ));
+                    generated_methods.insert(&method.name);
                 }
             }
             {
-                let fields = iter_dedupe_all(fields, |(f, _)| match &f.name {
+                let fields = iter_dedupe_all(fields.rev(), |(f, _)| match &f.name {
                     FieldName::Name(s) => *s,
                     FieldName::Wildcard { .. } => "[]",
                 });

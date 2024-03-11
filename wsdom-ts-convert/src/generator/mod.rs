@@ -74,16 +74,19 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
     ctx.classes
         .extend(declare_classes.clone().map(|dv| dv.name));
     for DeclareVar { name, ty } in declare_classes {
-        let Some((decl_members, direct_decl)) = (match ty {
-            TsType::Named {
-                ty: NamedType { name, .. },
-            } => ctx
-                .interfaces
-                .get(name)
-                .map(|interface| (&*interface.members, false)),
-            TsType::Interface { members } => Some((&**members, true)),
-            _ => None,
-        }) else {
+        // let Some((decl_members, direct_decl)) = (match ty {
+        //     TsType::Named {
+        //         ty: NamedType { name, .. },
+        //     } => ctx
+        //         .interfaces
+        //         .get(name)
+        //         .map(|interface| (&*interface.members, false)),
+        //     TsType::Interface { members } => Some((&**members, true)),
+        //     _ => None,
+        // }) else {
+        //     continue;
+        // };
+        let Some((decl_members, on_instance)) = ctx.get_members(ty) else {
             continue;
         };
 
@@ -108,7 +111,7 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
         }
         let iface = constructor
             .and_then(|(_, s)| ctx.interfaces.get(s))
-            .or_else(|| direct_decl.then(|| ctx.interfaces.get(name)).flatten())
+            .or_else(|| (!on_instance).then(|| ctx.interfaces.get(name)).flatten())
             .map(Cow::Borrowed)
             .unwrap_or_else(|| {
                 Cow::Owned(Interface {

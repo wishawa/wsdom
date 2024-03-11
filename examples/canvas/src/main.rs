@@ -41,22 +41,22 @@ async fn app(browser: Browser) {
         .get_context(&"2d", &wsdom::null())
         .unwrap()
         .unchecked_into();
-    let rect_drawer: &wsdom::dom::CanvasRect = ctx.as_ref();
-    let line_drawer: &wsdom::dom::CanvasPath = ctx.as_ref();
+    // let rect_drawer: &wsdom::dom::CanvasRect = ctx.as_ref();
+    // let line_drawer: &wsdom::dom::CanvasPath = ctx.as_ref();
 
-    rect_drawer.clear_rect(&0, &0, &200, &200);
+    ctx.clear_rect(&0, &0, &200, &200);
     loop {
         btn.set_inner_text(&"draw");
         click_stream.next().await;
 
-        wsdom::dom::CanvasDrawPath::begin_path(ctx.as_ref());
-        line_drawer.move_to(&75, &50);
-        line_drawer.line_to(&100, &75);
-        line_drawer.line_to(&100, &25);
-        wsdom::dom::CanvasDrawPath::fill(ctx.as_ref(), &wsdom::undefined());
+        ctx.begin_path();
+        ctx.move_to(&75, &50);
+        ctx.line_to(&100, &75);
+        ctx.line_to(&100, &25);
+        ctx.fill(&wsdom::undefined());
 
         btn.set_inner_text(&"clear");
         click_stream.next().await;
-        rect_drawer.clear_rect(&0, &0, &200, &200);
+        ctx.clear_rect(&0, &0, &200, &200);
     }
 }
