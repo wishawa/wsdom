@@ -1,14 +1,14 @@
 # WSDOM
 
-WSDOM is a Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
-It lets Rust code hold and manipulate JavaScript objects over the network.
+WSDOM is a roundtrip-free Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
+It lets Rust code hold and manipulate JavaScript objects over the network with minimum latency.
 
 WSDOM can be used to add network-dependent interactivity to webpages without writing JS code or making API endpoints. It can also be integrated into "LiveView"-style Rust web frameworks to expose access to the full Web API.
 
 # Quick Example
 ```rust
 // this Rust code runs on a Rust server
-async fn app(browser: wsdom::Browser) {
+fn hello(browser: wsdom::Browser) {
     let document = wsdom::dom::document(&browser) // get hold of a Document object
     let body = document.get_body(); // get the <body /> of that document object
     let elem = document.create_element(&"div", &wsdom::undefined()); // create a <div />
@@ -21,41 +21,58 @@ async fn app(browser: wsdom::Browser) {
 WSDOMConnectWebSocket("ws://example.com:3000/");
 ```
 
-The full "Hello World!" code (using with Tokio's [Axum web framework](https://github.com/tokio-rs/axum/)) is available [here](/exampls/hello/).
+Our full "Hello World!" code (using with Tokio's [Axum web framework](https://github.com/tokio-rs/axum/)) is available [here](/exampls/hello/).
 
-# Features
+# Key Features (and Anti-Features)
 -   WSDOM generates **strongly-typed** Rust stubs for JS classes/functions/methods based on `.d.ts` TypeScript definition.
     Stubs for the base JavaScript and DOM API are generated from the official TypeScript definitions [here](https://github.com/microsoft/TypeScript/tree/main/src/lib).
--   Calling JS code with WSDOM incurs **no network blocks**. This Rust code
+-   Calling JS code with WSDOM is **roundtrip-free**. This Rust code
     ```rust
     let mut val: JsNumber = browser.new_value(&1.0);
     for _ in 0..100 {
         val = wsdom::js::Math::cos(&browser, &val);
     }
     ```
-    does not block at all; it will finish in microseconds.
--   WSDOM does **asynchronous retrieval**. Values are sent back to the Rust side only when explicitly requested.
-    For example, to get the value computed by the loop above, one would do
-    ```rust
-    let val_retrieved: f64 = val.retrieve_f64().await;
-    println!("the value of (cos^[100])(1.0) computed in JavaScript is {val_retrieved}");
-    ```
-    the `.await` will take one network roundtrip.
--   WSDOM is **memory safe & efficient**. JS objects are automatically freed when and only when they are no longer needed.
--   WSDOM is one-way, so JS code cannot directly call Rust code.
-    To make event handling possible, WSDOM employs **Futures-based interactivity** with JS callbacks connected to Rust streams.
-    ```rust
-    async fn example(browser: Browser, button: &HTMLElement) {
-        let (stream, callback) = wsdom::callback::new_callback::<MouseEvent>(&browser);
-        button.add_event_listener(&"click", &callback, &NullImmediate);
-        let _click_event = stream.next().await; // wait for the Stream to yield
-        println!("button was clicked on the browser!");
-    }
-    ```
--   WSDOM has **pluggable transport**. Any text protocol can be substituted for the default WebSocket transport.
--   WSDOM is **framework-agnostic**. Any web framework with WebSocket or comparable two-way text protocol can be used.
-    I provide a ready-made adapter for use with the [Axum web framework](https://github.com/tokio-rs/axum/) and its WebSocket implementation.
--   WSDOM is **executor-agnostic**. Any async Rust executor will work.
+    does not block on the network at all; it will finish in *microseconds*.
+    -   Roundtrip-free calling is possible because **WSDOM keeps values on the JS side**, sending them back to Rust only when explicitly requested.
+        To get the value computed by the loop above, one would do
+        ```rust
+        let val_retrieved: f64 = val.retrieve_f64().await;
+        println!("the value of (cos^[100])(1.0) computed in JavaScript is {val_retrieved}");
+        ```
+        the `.await` will take one network roundtrip.
+-   Due to the roundtrip-free design, **WSDOM fundamentally cannot handle JS exceptions**.
+    -   If one of the `Math.cos` calls in our loop above throws,
+        the Rust loop will still complete all 100 iterations without panic or any sort of warning (see [the Roundtrip Free Calls section](#roundtrip-free-calls) for why).
+        As you might expect, this means code using WSDOM are **very painful to debug**.
+-   WSDOM is **one-way**. Rust code can call JS code but not the other way around.
+    -   To make event handling possible, WSDOM employs **Futures-based interactivity** with JS callbacks connected to Rust streams.
+        ```rust
+        async fn example(browser: Browser, button: &HTMLElement) {
+            let (stream, callback) = wsdom::callback::new_callback::<MouseEvent>(&browser);
+            button.add_event_listener(&"click", &callback, &wsdom::undefined());
+            let _click_event: MouseEvent = stream.next().await; // wait for the Stream to yield
+            println!("button was clicked on the browser!");
+        }
+        ```
+-   WSDOM itself is **transport-agnostic**, **framework-agnostic**, and **executor-agnostic**,
+    but I provide an integration library for easily getting started with WSDOM on
+    [Axum web framework](https://github.com/tokio-rs/axum/) (which uses the Tokio executor) with WebSocket.
+
+# Comparisons
+### [web-sys](https://docs.rs/web-sys/latest/web_sys/)
+WSDOM serves a similar role as web-sys (and a bit of [js-sys](https://docs.rs/js-sys/latest/js_sys/) too),
+but instead of running your Rust in WebAssembly in the same browser,
+we let you run your Rust code away across a WebSocket connection.
+
+WSDOM's translation of JS API to Rust is different from web-sys.
+We translate from TypeScript declarations, rather than directly from WebIDLs.
+The network gap also means our optional types take the form of `JsNullable<_>` (compared to the `Option<_>` of web-sys).
+
+### [jsdom](https://github.com/jsdom/jsdom)
+WSDOM and jsdom are similar in that we both expose the web browser's API outside a web browser.
+jsdom does so by implementing the API themselves.
+WSDOM does so by forwarding calls to a real web browser running across a WebSocket connection.
 
 # How It Works
 ## Code Serialization
@@ -118,7 +135,37 @@ impl Drop for JsValue {
 }
 ```
 
+You can think of a `JsValue` as a smart pointer that points to object in a heap,
+only that the heap lives in JavaScript and is on a remote machine. A bump allocator running on the Rust side manages the heap.
+<!-- **A bit of Rust evangelism**: In most other programming languages, a memory management scheme like this wouldn't be possible.
+Rust's precise memory management means `Drop::drop` is called as soon as the object is no longer needed.
+In a GC-ed language, it can take minutes (or even hours) until object destructors are called.
+During this time, the JS-side `VALUES` map would fill up, wasting memory. -->
+
+## Roundtrip-Free Calls
+Our memory management approach enables roundtrip-free calls.
+The way we do it is easily demonstrated with an example.
+This Rust code
+```rust
+let val_a = browser.new_value::<JsNumber>(&0.5);
+let val_b = wsdom::js::Math::cos(&browser, &val_a);
+let val_c = wsdom::js::Math::cos(&browser, &val_b);
+```
+will produce JavaScript code that looks something like
+```js
+VALUES.set(1, 0.5); // browser.new_value(&0.5)
+VALUES.set(2, Math.cos(VALUES.get(1))); // val_b = ...
+VALUES.delete(1); // val_a dropped
+VALUES.set(3, Math.cos(VALUES.get(2))); // val_c = ...
+VALUES.delete(2); // val_b dropped
+```
+The serialized JS code are sent to the JS side in batches.
+This means *the 3-lines Rust code probably finishes before the first line of JS code even reaches the JS side*.
+You now see where our "fundamentally cannot handle JS exceptions" anti-feature came from.
+
 # Disclaimer
 
-WSDOM is alpha-quality software at best. Use at your own risk.
+Use WSDOM at your own risk. It is alpha-quality at best.
+
+The Rust code produced by our `.d.ts` loader might change between WSDOM versions.
 
