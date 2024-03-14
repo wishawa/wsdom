@@ -375,6 +375,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "futures-util",
+ "ref-cast",
  "tokio",
  "wsdom",
  "wsdom-axum",

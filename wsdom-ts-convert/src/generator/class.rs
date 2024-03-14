@@ -284,8 +284,7 @@ impl<'a> Context<'a> {
         is_overload: bool,
         field_name_conflict: bool,
     ) -> Option<TokenStream> {
-        let is_constructor =
-            !on_instance && matches!(method.name, crate::parser::method::MethodName::Constructor);
+        let is_constructor = matches!(method.name, crate::parser::method::MethodName::Constructor);
         let method_name_str = match method.name {
             crate::parser::method::MethodName::Nothing => "call_self",
             crate::parser::method::MethodName::Constructor => "new",
@@ -317,11 +316,14 @@ impl<'a> Context<'a> {
         );
         let method_generics = self.make_sig_generics(&method.generics.args);
         Some(match (on_instance, is_constructor) {
-            (true, _) => quote! {
-                __wsdom_load_ts_macro::expand_method!(self @ #method_name_ident, [#method_generics], [#(#arg_names : #arg_types,)*], #ret, #method_name_str, #last_arg_variadic);
+            (true, true) => quote! {
+                __wsdom_load_ts_macro::expand_method!(constructor @ #method_name_ident, [#method_generics], [#(#arg_names : #arg_types,)*], Self, #interface_name, #last_arg_variadic);
             },
             (false, true) => quote! {
-                __wsdom_load_ts_macro::expand_method!(constructor @ #method_name_ident, [#(#arg_names : #arg_types,)*], #ret, #interface_name, #last_arg_variadic);
+                __wsdom_load_ts_macro::expand_method!(constructor @ #method_name_ident, [], [#(#arg_names : #arg_types,)*], #ret, #interface_name, #last_arg_variadic);
+            },
+            (true, false) => quote! {
+                __wsdom_load_ts_macro::expand_method!(self @ #method_name_ident, [#method_generics], [#(#arg_names : #arg_types,)*], #ret, #method_name_str, #last_arg_variadic);
             },
             (false, false) => {
                 let function = format!("{}.{}", interface_name, method_name_str);
@@ -330,40 +332,6 @@ impl<'a> Context<'a> {
                 }
             }
         })
-        // if on_instance {
-        //     Some(quote! {
-        //         pub fn #method_name_ident #method_generics (&self, #(#arg_names_sig: #arg_types,)*) -> #ret {
-        //             __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-        //                 __wsdom_load_ts_macro::JsObject::js_call_method(self.as_ref(), #method_name_str, [
-        //                     #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
-        //                 ], #last_arg_variadic)
-        //             )
-        //         }
-        //     })
-        // } else {
-        //     if is_constructor {
-        //         Some(quote! {
-        //             pub fn #method_name_ident (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
-        //                 __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-        //                     browser.call_constructor(#interface_name, [
-        //                         #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
-        //                     ], #last_arg_variadic)
-        //                 )
-        //             }
-        //         })
-        //     } else {
-        //         let function = format!("{}.{}", interface_name, method_name_str);
-        //         Some(quote! {
-        //             pub fn #method_name_ident #method_generics (browser: &__wsdom_load_ts_macro::Browser, #(#arg_names_sig: #arg_types,)*) -> #ret {
-        //                 __wsdom_load_ts_macro::JsCast::unchecked_from_js(
-        //                     browser.call_function(#function, [
-        //                         #(  __wsdom_load_ts_macro::UpcastWorkaround::new( #arg_names_body ).cast(), )*
-        //                     ], #last_arg_variadic)
-        //                 )
-        //             }
-        //         })
-        //     }
-        // }
     }
     fn make_field_code(
         &self,

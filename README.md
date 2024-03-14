@@ -3,7 +3,7 @@
 WSDOM is a roundtrip-free Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
 It lets Rust code hold and manipulate JavaScript objects over the network with minimum latency.
 
-WSDOM can be used to add network-dependent interactivity to webpages without writing JS code or making API endpoints. It can also be integrated into "LiveView"-style Rust web frameworks to expose access to the full Web API.
+WSDOM can be used to add network-dependent functionalities to webpages without writing JS code or making API endpoints. It can also be integrated into "LiveView"-style Rust web frameworks to expose access to the full Web API.
 
 # Quick Example
 ```rust
@@ -24,16 +24,16 @@ WSDOMConnectWebSocket("ws://example.com:3000/");
 Our full "Hello World!" code (using with Tokio's [Axum web framework](https://github.com/tokio-rs/axum/)) is available [here](/exampls/hello/).
 
 # Key Features (and Anti-Features)
--   WSDOM generates **strongly-typed** Rust stubs for JS classes/functions/methods based on `.d.ts` TypeScript definition.
+-   WSDOM generates **strongly-typed** Rust stubs for JS classes/functions/methods based on `.d.ts` TypeScript definitions.
     Stubs for the base JavaScript and DOM API are generated from the official TypeScript definitions [here](https://github.com/microsoft/TypeScript/tree/main/src/lib).
 -   Calling JS code with WSDOM is **roundtrip-free**. This Rust code
     ```rust
     let mut val: JsNumber = browser.new_value(&1.0);
     for _ in 0..100 {
-        val = wsdom::js::Math::cos(&browser, &val);
+        val = wsdom::js::Math::cos(&browser, &val); // Math.cos on the JS side
     }
     ```
-    does not block on the network at all; it will finish in *microseconds*.
+    does not block on the network at all; it will finish in microseconds.
     -   Roundtrip-free calling is possible because **WSDOM keeps values on the JS side**, sending them back to Rust only when explicitly requested.
         To get the value computed by the loop above, one would do
         ```rust

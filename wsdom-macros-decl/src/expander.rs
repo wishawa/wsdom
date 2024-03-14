@@ -100,8 +100,8 @@ macro_rules! expand_method {
             )
         }
     };
-    (constructor @ $method_name:ident, [$($arg_names:ident : $arg_types:ty,)*], $ret:ty, $interface_name:literal, $last_variadic:literal) => {
-        pub fn $method_name (browser: &__wsdom_load_ts_macro::Browser, $($arg_names: $arg_types,)*) -> $ret {
+    (constructor @ $method_name:ident, [$($generics:tt)*], [$($arg_names:ident : $arg_types:ty,)*], $ret:ty, $interface_name:literal, $last_variadic:literal) => {
+        pub fn $method_name $($generics)* (browser: &__wsdom_load_ts_macro::Browser, $($arg_names: $arg_types,)*) -> $ret {
             __wsdom_load_ts_macro::JsCast::unchecked_from_js(
                 browser.call_constructor($interface_name, [
                     $(  __wsdom_load_ts_macro::UpcastWorkaround::new( $arg_names ).cast(), )*
