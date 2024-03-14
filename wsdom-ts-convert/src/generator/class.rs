@@ -308,7 +308,13 @@ impl<'a> Context<'a> {
         let method_name_ident = new_ident_safe(&rust_name_str);
         let (arg_types, arg_names, last_arg_variadic) = self.make_sig_args(&method.args);
         // let arg_names_body = arg_names_sig.clone();
-        let ret = self.convert_type(self.simplify_type(method.ret.to_owned()));
+        let ret = self.convert_type(
+            method
+                .ret
+                .to_owned()
+                .map(|t| self.simplify_type(t))
+                .unwrap_or(known_types::NULL),
+        );
         let method_generics = self.make_sig_generics(&method.generics.args);
         Some(match (on_instance, is_constructor) {
             (true, _) => quote! {

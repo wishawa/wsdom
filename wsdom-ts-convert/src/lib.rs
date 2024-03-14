@@ -1,3 +1,6 @@
+use parser::{comment::WithComment, item::Item};
+use quote::quote;
+
 pub(crate) mod generator;
 pub(crate) mod parser;
 
@@ -23,13 +26,9 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-pub fn convert(
-    file: std::fs::File,
-) -> Result<proc_macro2::TokenStream, Box<dyn std::error::Error>> {
+fn parse_str(content: &str) -> Result<Vec<WithComment<'_, Item<'_>>>, Box<dyn std::error::Error>> {
     use winnow::Parser;
-
-    let content = std::io::read_to_string(file)?;
-    let mut input = &*content;
+    let mut input = content;
 
     let _imports = match parser::parse_imports.parse_next(&mut input) {
         Ok(i) => i,
@@ -38,24 +37,43 @@ pub fn convert(
                 error: e
                     .into_inner()
                     .expect("complete parsers should not report `ErrMode::Incomplete(_)`"),
-                content,
+                content: content.to_string(),
             }
             .into())
         }
     };
 
-    let parsed = match parser::parse_all.parse(input) {
-        Ok(i) => i,
-        Err(e) => {
-            return Err(ParseError {
-                error: e.into_inner(),
-                content,
-            }
-            .into())
+    parser::parse_all.parse(input).map_err(|e| {
+        ParseError {
+            error: e.into_inner(),
+            content: content.to_string(),
         }
-    };
+        .into()
+    })
+}
 
-    let types = generator::generate_all(&parsed);
+pub fn convert(
+    file: std::fs::File,
+) -> Result<proc_macro2::TokenStream, Box<dyn std::error::Error>> {
+    let content = std::io::read_to_string(file)?;
+    let parsed = parse_str(&*content)?;
+    let out = generator::generate_all(&parsed, &[]);
 
-    Ok(types)
+    Ok(out)
+}
+
+pub fn convert_custom(
+    file: std::fs::File,
+) -> Result<proc_macro2::TokenStream, Box<dyn std::error::Error>> {
+    let custom_content = std::io::read_to_string(file)?;
+    let custom_parsed = parse_str(&*custom_content)?;
+
+    let out = generator::generate_all(&custom_parsed, &[]);
+
+    Ok(quote! {
+        use wsdom::__wsdom_load_ts_macro;
+        use wsdom::dom::*;
+        use wsdom::js::*;
+        #out
+    })
 }

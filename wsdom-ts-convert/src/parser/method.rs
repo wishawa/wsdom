@@ -1,12 +1,12 @@
 use winnow::{
-    combinator::{alt, delimited, opt, separated0, separated_pair},
+    combinator::{alt, delimited, opt, preceded, separated0, separated_pair},
     PResult, Parser,
 };
 
 use super::{
     generic::GenericsDeclaration,
     ts_type::TsType,
-    util::{token, word0, word1, Parsable},
+    util::{token, token_word, word0, word1, Parsable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,13 +14,15 @@ pub(crate) struct Method<'a> {
     pub name: MethodName<'a>,
     pub generics: GenericsDeclaration<'a>,
     pub args: Vec<MethodArg<'a>>,
-    pub ret: TsType<'a>,
+    pub ret: Option<TsType<'a>>,
     pub optional: bool,
+    pub is_static: bool,
 }
 impl<'a> Parsable<'a> for Method<'a> {
     fn parse(input: &mut &'a str) -> PResult<Self> {
-        separated_pair(
+        (
             (
+                opt(token_word("static")),
                 MethodName::parse,
                 opt(token("?")),
                 opt(GenericsDeclaration::parse),
@@ -30,17 +32,17 @@ impl<'a> Parsable<'a> for Method<'a> {
                     token(')'),
                 ),
             ),
-            token(':'),
-            TsType::parse,
+            opt(preceded(token(':'), TsType::parse)),
         )
-        .parse_next(input)
-        .map(|((name, optional, generics, args), ret)| Self {
-            name,
-            generics: generics.unwrap_or_default(),
-            args,
-            ret,
-            optional: optional.is_some(),
-        })
+            .parse_next(input)
+            .map(|((is_static, name, optional, generics, args), ret)| Self {
+                name,
+                generics: generics.unwrap_or_default(),
+                args,
+                ret,
+                optional: optional.is_some(),
+                is_static: is_static.is_some(),
+            })
     }
 }
 
@@ -81,7 +83,7 @@ impl<'a> Parsable<'a> for MethodName<'a> {
             delimited(token('['), "Symbol.iterator", token(']')).map(|_| Self::Iterator),
             word0.map(|s| match s {
                 "" => Self::Nothing,
-                "new" => Self::Constructor,
+                "new" | "constructor" => Self::Constructor,
                 s => Self::Name(s),
             }),
         ))

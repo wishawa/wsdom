@@ -18,6 +18,7 @@ use crate::{
     generator::util::iter_dedupe_consecutive,
     parser::{
         comment::WithComment,
+        declare_class::DeclareClass,
         declare_var::DeclareVar,
         generic::GenericsDeclaration,
         interface::Interface,
@@ -35,11 +36,14 @@ struct Context<'a> {
     inhr_graph: HashMap<&'a str, (GenericsDeclaration<'a>, Vec<NamedType<'a>>)>,
 }
 
-pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream {
+pub(crate) fn generate_all<'a>(
+    dts: &[WithComment<'a, Item<'a>>],
+    dts_for_inhr: &[WithComment<'a, Item<'a>>],
+) -> TokenStream {
     let mut generated_code = Vec::<TokenStream>::new();
     let mut interfaces = HashMap::new();
     let mut inhr_graph = HashMap::new();
-    for item in dts {
+    for item in dts.into_iter().chain(dts_for_inhr.into_iter()) {
         match &item.data {
             Item::Interface(interface) => {
                 let interface = interface.clone();
@@ -69,23 +73,15 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
         Item::DeclareVar(dv) => Some(dv),
         _ => None,
     });
-    let declare_classes = declare_vars.clone().filter(|dv| starts_with_cap(dv.name));
+    let declare_classlike_vars = declare_vars.clone().filter(|dv| starts_with_cap(dv.name));
     let declare_global_vars = declare_vars.filter(|dv| !starts_with_cap(dv.name));
     ctx.classes
-        .extend(declare_classes.clone().map(|dv| dv.name));
-    for DeclareVar { name, ty } in declare_classes {
-        // let Some((decl_members, direct_decl)) = (match ty {
-        //     TsType::Named {
-        //         ty: NamedType { name, .. },
-        //     } => ctx
-        //         .interfaces
-        //         .get(name)
-        //         .map(|interface| (&*interface.members, false)),
-        //     TsType::Interface { members } => Some((&**members, true)),
-        //     _ => None,
-        // }) else {
-        //     continue;
-        // };
+        .extend(declare_classlike_vars.clone().map(|dv| dv.name));
+    let declare_classes = dts.iter().filter_map(|item| match &item.data {
+        Item::DeclareClass(c) => Some(c),
+        _ => None,
+    });
+    for DeclareVar { name, ty } in declare_classlike_vars {
         let Some((decl_members, on_instance)) = ctx.get_members(ty) else {
             continue;
         };
@@ -95,22 +91,24 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
                 method @ Method {
                     name: MethodName::Constructor,
                     ret:
-                        TsType::Named {
-                            ty: NamedType { name, .. },
-                        },
+                        Some(
+                            ret @ TsType::Named {
+                                ty: NamedType { name, .. },
+                            },
+                        ),
                     ..
                 },
-            ) => Some((method, name)),
+            ) => Some((method, ret, name)),
             _ => None,
         });
-        if let Some((method, ret_name)) = constructor {
+        if let Some((method, ret, ret_name)) = constructor {
             if ret_name != name {
-                generated_code.push(ctx.make_custom_constructor(name, &method.args, &method.ret));
+                generated_code.push(ctx.make_custom_constructor(name, &method.args, ret));
                 continue;
             }
         }
         let iface = constructor
-            .and_then(|(_, s)| ctx.interfaces.get(s))
+            .and_then(|(_, _, s)| ctx.interfaces.get(s))
             .or_else(|| (!on_instance).then(|| ctx.interfaces.get(name)).flatten())
             .map(Cow::Borrowed)
             .unwrap_or_else(|| {
@@ -122,6 +120,22 @@ pub(crate) fn generate_all<'a>(dts: &[WithComment<'a, Item<'a>>]) -> TokenStream
                 })
             });
         generated_code.push(ctx.make_class(&*iface, decl_members));
+    }
+    for DeclareClass {
+        name,
+        generics,
+        members,
+    } in declare_classes
+    {
+        generated_code.push(ctx.make_class(
+            &Interface {
+                extends: Default::default(),
+                generics: generics.to_owned(),
+                members: members.to_owned(),
+                name: *name,
+            },
+            &[],
+        ));
     }
     for DeclareVar { name, ty } in declare_global_vars {
         generated_code.push(ctx.make_global_var_getter(name, ty));

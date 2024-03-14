@@ -9,6 +9,7 @@ use crate::parser::util::{quote_backslash_escape, token, token_word};
 use self::util::Parsable;
 
 pub(crate) mod comment;
+pub(crate) mod declare_class;
 pub(crate) mod declare_function;
 pub(crate) mod declare_var;
 pub(crate) mod expr;
@@ -120,13 +121,14 @@ declare var Element: {
                                     name: MethodName::Constructor,
                                     generics: Default::default(),
                                     args: vec![],
-                                    ret: TsType::Named {
+                                    ret: Some(TsType::Named {
                                         ty: NamedType {
                                             name: "Element",
                                             generic: Default::default()
                                         }
-                                    },
-                                    optional: false
+                                    }),
+                                    optional: false,
+                                    is_static: false
                                 })
                             }
                         ]

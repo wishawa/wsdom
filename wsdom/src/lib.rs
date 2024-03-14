@@ -1,5 +1,3 @@
-pub use wsdom_macros::load_ts;
-
 #[doc(hidden)]
 pub mod __wsdom_load_ts_macro {
     pub use ref_cast::RefCast;
@@ -17,6 +15,7 @@ pub use wsdom_core::immediates::*;
 pub use wsdom_core::{js_types, Browser, JsCast, ToJs};
 pub use wsdom_dom as dom;
 pub use wsdom_javascript as js;
+pub use wsdom_macros::load_custom_ts;
 
 #[allow(non_snake_case)]
 #[cfg(test)]
