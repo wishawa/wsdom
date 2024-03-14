@@ -1,7 +1,7 @@
 # WSDOM
 
 WSDOM is a roundtrip-free Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
-It lets Rust code hold and manipulate JavaScript objects over the network with minimum latency.
+It lets Rust code hold and manipulate JavaScript objects over the network.
 
 WSDOM can be used to add network-dependent functionalities to webpages without writing JS code or making API endpoints. It can also be integrated into "LiveView"-style Rust web frameworks to expose access to the full Web API.
 
@@ -37,7 +37,7 @@ Our full "Hello World!" code (using with Tokio's [Axum web framework](https://gi
     -   Roundtrip-free calling is possible because **WSDOM keeps values on the JS side**, sending them back to Rust only when explicitly requested.
         To get the value computed by the loop above, one would do
         ```rust
-        let val_retrieved: f64 = val.retrieve_f64().await;
+        let val_retrieved: f64 = val.retrieve_float().await;
         println!("the value of (cos^[100])(1.0) computed in JavaScript is {val_retrieved}");
         ```
         the `.await` will take one network roundtrip.

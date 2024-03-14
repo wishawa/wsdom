@@ -1,5 +1,27 @@
+/*!
+# WSDOM
+
+WSDOM is a roundtrip-free Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
+It lets Rust code hold and manipulate JavaScript objects over the network.
+
+For an overview of what this library does, see the [README on GitHub](https://github.com/wishawa/wsdom).
+
+# Documentation
+`wsdom::dom` is the module you will be working with most of the time.
+This module contains stubs for the Web API (`HTMLElement`, `Canvas`, etc.).
+The stubs were auto-generated so they don't have documentation attached to them,
+but you can always look for the item with the corresponding name on [MDN](https://developer.mozilla.org/en-US/docs/Web/API).
+
+The `wsdom::js` module contains stubs for the base JavaScript functionalities (`ArrayBuffer`, `RegExp`, etc.).
+Note that this module is **incomplete**. I only auto-generated a small subset of the JS API
+(because the TypeScript typings for these stuff are quite complicated so auto-translating them to Rust is hard).
+
+The `js_types` module contains JavaScript primitives such as `number`, `string`, and `object`.
+*/
+
 #[doc(hidden)]
 pub mod __wsdom_load_ts_macro {
+    //! Private module for our macro. Don't use this.
     pub use ref_cast::RefCast;
     pub use wsdom_core::{
         for_macro::{RawCodeImmediate, UpcastWorkaround},

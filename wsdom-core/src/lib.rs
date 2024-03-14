@@ -11,6 +11,7 @@ mod serialize;
 pub use link::{Browser, Error};
 
 pub mod js_types {
+    //! Stubs for primitive JS types including number, string, null, undefined, object.
     pub use super::js::{
         nullable::{JsNullable, JsNullish},
         object::JsObject,

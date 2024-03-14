@@ -1,3 +1,27 @@
+/*!
+Interactivity for handling JS events.
+
+WSDOM is **one-way**, so JS code cannot directly call Rust code.
+Instead, we adopt a mechanism based on async.
+
+The [new_callback] function returns a Rust [Stream][futures_core::Stream] `s` *and*
+a JavaScript object `f` that can be called (i.e. a function/closure).
+Each time `f` is called like `f(arg)`,
+the Rust stream will yield the `arg` object.
+
+```rust
+# use wsdom_core::Browser;
+async fn example(browser: &Browser, button: wsdom::dom::HTMLButtonElement) {
+    let (mut stream, func) = wsdom::callback::new_callback::<wsdom::dom::MouseEvent>(&browser);
+    button.add_event_listener(&"click", &func, &wsdom::undefined());
+
+    use futures_util::StreamExt;
+    let _click_event: wsdom::dom::MouseEvent = stream.next().await;
+    println!("the button was clicked!");
+}
+```
+*/
+
 use std::{fmt::Write, marker::PhantomData, pin::Pin, task::Poll};
 
 use crate::{
@@ -83,17 +107,6 @@ impl<E> Drop for Callback<E> {
 ///
 /// The returned Callback object is a stream. Every time the returned function is called,
 /// the stream will yield the call argument as value.
-///
-/// ```rust
-/// # use wsdom_core::Browser;
-/// async fn example(browser: &Browser, button: wsdom::dom::HTMLButtonElement) {
-///     let (mut callback, func) = wsdom::callback::new_callback::<wsdom::dom::MouseEvent>(&browser);
-///     button.add_event_listener(&"click", &func, &wsdom::null());
-///     use futures_util::StreamExt;
-///     callback.next().await;
-///     println!("the button was clicked!");
-/// }
-/// ```
 pub fn new_callback<E>(browser: &Browser) -> (Callback<E>, JsValue) {
     let mut link = browser.0.lock().unwrap();
     let arr_id = link.get_new_id();

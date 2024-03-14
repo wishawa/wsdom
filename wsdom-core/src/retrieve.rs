@@ -8,6 +8,8 @@ use crate::link::{BrowserInternal, Error, RetrievalState};
 use crate::protocol::{GET, REP};
 
 /// A [Future] for retrieving value from the JS side to the Rust side.
+///
+/// If something goes wrong (for example if the network disconnects), this Future will simply pend forever.
 pub struct RetrieveFuture<'a, T: DeserializeOwned> {
     pub(crate) id: u64,
     pub(crate) ret_id: u64,

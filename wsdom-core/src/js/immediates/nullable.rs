@@ -25,9 +25,12 @@ impl UseInJsCode for UndefinedImmediate {
 impl ToJs<JsNullish> for UndefinedImmediate {}
 impl<T> ToJs<JsNullable<T>> for UndefinedImmediate {}
 
+/// The return value implements `ToJs<JsNullish>` and `ToJs<JsNullable<T>>`.
 pub const fn null() -> NullImmediate {
     NullImmediate
 }
+
+/// The return value implements `ToJs<JsNullish>` and `ToJs<JsNullable<T>>`.
 pub const fn undefined() -> UndefinedImmediate {
     UndefinedImmediate
 }
