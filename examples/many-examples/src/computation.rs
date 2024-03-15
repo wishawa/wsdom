@@ -19,5 +19,9 @@ pub async fn app(browser: Browser) {
         let dfx = &(&fxdelta - &fx) / &DELTA;
         x = &x - &(&fx / &dfx);
     }
+    wsdom::dom::console(&browser).log(&[&"The root of 5x^2 - 3x + 4.2 is:"]);
     wsdom::dom::console(&browser).log(&[AsRef::<JsValue>::as_ref(&x)]);
+    let document = wsdom::dom::document(&browser);
+    let text_node = document.create_text_node(&"check your browser console");
+    document.get_body().append_child(&text_node);
 }
