@@ -11,4 +11,4 @@ mod __wsdom_load_ts_macro {
 }
 use wsdom_javascript::*;
 
-wsdom_macros::load_ts!("../typescript-defs/used/dom.generated.d.ts");
+wsdom_macros::load_ts!("dom.generated.d.ts");

@@ -10,6 +10,6 @@ mod __wsdom_load_ts_macro {
     pub use wsdom_macros_decl::*;
 }
 
-wsdom_macros::load_ts!("../typescript-defs/used/es5-handpicked.d.ts");
+wsdom_macros::load_ts!("es5-handpicked.d.ts");
 
 mod misc_impl;
