@@ -61,7 +61,7 @@
 				this.values = new Map();
 			}
 		}
-		WSDOMConnectWebSocket("ws://localhost:4000/ws");
+		WSDOMConnectWebSocket(window.location.href.replace('http://', 'ws://') + '/ws');
 	</script>
 	<style>
 		#connecting-label {
