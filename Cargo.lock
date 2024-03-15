@@ -1133,7 +1133,7 @@ dependencies = [
 
 [[package]]
 name = "wsdom"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "ref-cast",
  "serde",
@@ -1146,7 +1146,7 @@ dependencies = [
 
 [[package]]
 name = "wsdom-axum"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "axum",
  "futures-util",
@@ -1156,7 +1156,7 @@ dependencies = [
 
 [[package]]
 name = "wsdom-core"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -1168,7 +1168,7 @@ dependencies = [
 
 [[package]]
 name = "wsdom-dom"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "ref-cast",
  "serde",
@@ -1180,7 +1180,7 @@ dependencies = [
 
 [[package]]
 name = "wsdom-javascript"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "ref-cast",
  "serde",
@@ -1191,7 +1191,7 @@ dependencies = [
 
 [[package]]
 name = "wsdom-macros"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1201,11 +1201,11 @@ dependencies = [
 
 [[package]]
 name = "wsdom-macros-decl"
-version = "0.1.0"
+version = "0.0.1"
 
 [[package]]
 name = "wsdom-ts-convert"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "proc-macro2",
  "quote",

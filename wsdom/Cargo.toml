@@ -1,15 +1,21 @@
 [package]
 name = "wsdom"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+description = "roundtrip-free Rust to JavaScript *remote method invocation* or *distributed objects* system"
+license = "MPL-2.0"
+keywords = ["rpc", "remote", "javascript"]
+categories = ["api-bindings"]
+repository = "https://github.com/wishawa/wsdom"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wsdom-macros = { path = "../wsdom-macros/" }
-wsdom-macros-decl = { path = "../wsdom-macros-decl/" }
-wsdom-core = { path = "../wsdom-core/" }
-wsdom-javascript = { path = "../wsdom-javascript/" }
-wsdom-dom = { path = "../wsdom-dom/" }
+wsdom-macros = { path = "../wsdom-macros/", version = "0.0.1" }
+wsdom-macros-decl = { path = "../wsdom-macros-decl/", version = "0.0.1" }
+wsdom-core = { path = "../wsdom-core/", version = "0.0.1" }
+wsdom-javascript = { path = "../wsdom-javascript/", version = "0.0.1" }
+wsdom-dom = { path = "../wsdom-dom/", version = "0.0.1" }
 ref-cast = "1"
 serde = { version = "1" }
