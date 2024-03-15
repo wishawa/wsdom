@@ -1,11 +1,8 @@
-The "LiveView" design has been gaining popularity
-(we have [Phoenix LiveView](https://github.com/phoenixframework/phoenix_live_view), [LiveViewJS](https://www.liveviewjs.com/), [Dioxus LiveView](https://dioxuslabs.com/learn/0.5/reference/liveview)).
-But why limit ourselves to *View*? Why not Live*Everything*?
+"LiveView" frameworks like [Phoenix LiveView](https://github.com/phoenixframework/phoenix_live_view), [LiveViewJS](https://www.liveviewjs.com/), and [Dioxus LiveView](https://dioxuslabs.com/learn/0.5/reference/liveview) are amazing. But why limit ourselves to Live*View*? Why not Live*Everything*?
 
 # WSDOM
 [<img alt="crates.io" src="https://img.shields.io/crates/v/wsdom?style=for-the-badge" height="20">](https://crates.io/crates/wsdom)
 [<img alt="crates.io" src="https://img.shields.io/docsrs/wsdom?style=for-the-badge" height="20">](https://docs.rs/wsdom)
-
 WSDOM is a no-roundtrip Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
 It lets Rust code hold JavaScript objects and call methods/functions over the network.
 
