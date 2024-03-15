@@ -11,7 +11,7 @@ categories = ["api-bindings"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures-util = "0.3"
-axum = "0.7"
+futures-util = { version = "0.3", features = ["sink"] }
+axum = { version = "0.7", features = ["ws"] }
 wsdom-core = { path = "../../wsdom-core/", version = "0.0.1" }
 pin-project-lite = "0.2.13"
