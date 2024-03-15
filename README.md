@@ -18,7 +18,7 @@ fn hello(browser: wsdom::Browser) {
 ```
 ```js
 // this JavaScript code runs on the browser
-WSDOMConnectWebSocket("ws://example.com:3000/");
+WSDOMConnectWebSocket("ws://example.com:4000/");
 ```
 
 Our full "Hello World!" code (using with Tokio's [Axum web framework](https://github.com/tokio-rs/axum/)) is available [here](/exampls/hello/).

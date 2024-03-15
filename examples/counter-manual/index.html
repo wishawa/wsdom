@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Document</title>
+	<script>
+		function WSDOMConnectWebSocket(wsUrl, wsProtocols) {
+			const ws = new WebSocket(wsUrl, wsProtocols);
+			const wsdom = new WSDOM((msg) => {
+				ws.send(msg);
+			});
+			ws.onopen = () => {
+				console.debug("WSDOM WebSocket connection open!");
+				console.debug("WebSocket object", ws);
+				console.debug("WSDOM object", wsdom);
+			};
+			ws.onmessage = (msg) => {
+				wsdom.handleIncomingMessage(msg.data);
+			};
+			ws.onclose = (ev) => {
+				console.debug("WSDOM WebSocket closed", ev);
+			};
+			ws.onerror = (ev) => {
+				console.warn("WSDOM WebSocket errored", ev);
+			};
+		}
+		class WSDOM {
+			constructor(sendMessage) {
+				this.internal = new WSDOMInternal(sendMessage);
+			}
+			handleIncomingMessage(msg) {
+				const fn = new Function('_w', msg);
+				fn(this.internal);
+			}
+		}
+		class WSDOMInternal {
+			constructor(sender) {
+				this.g = (id) => {
+					return this.values.get(id);
+				};
+				this.s = (id, value) => {
+					this.values.set(id, value);
+				};
+				this.d = (id) => {
+					this.values.delete(id);
+				};
+				this.r = (id, val) => {
+					const valJson = JSON.stringify(val);
+					(this.sender)(`${id}:${valJson}`);
+				};
+				this.sender = sender;
+				this.values = new Map();
+			}
+		}
+		WSDOMConnectWebSocket("ws://localhost:4000/ws");
+	</script>
+</head>
+
+<body>
+
+</body>
+
+</html>

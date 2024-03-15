@@ -9,17 +9,17 @@ use wsdom::js_types::JsValue;
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/ws", get(handler));
+    let router = Router::new().route("/ws", get(handler));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:4000").await.unwrap();
+    axum::serve(listener, router).await.unwrap();
 }
 
 async fn handler(ws: WebSocketUpgrade) -> Response {
-    ws.on_upgrade(handle_socket)
+    ws.on_upgrade(app)
 }
 
-async fn handle_socket(socket: WebSocket) {
+async fn app(socket: WebSocket) {
     use futures_util::StreamExt;
     let browser = wsdom::Browser::new();
 

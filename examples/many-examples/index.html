@@ -4,8 +4,12 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Document</title>
+	<title>WSDOM Demo</title>
 	<script>
+		function setConnectingLabel(text) {
+			const conLabelUi = document.getElementById("connecting-label");
+			if (conLabelUi) conLabelUi.innerText = text;
+		}
 		function WSDOMConnectWebSocket(wsUrl, wsProtocols) {
 			const ws = new WebSocket(wsUrl, wsProtocols);
 			const wsdom = new WSDOM((msg) => {
@@ -15,15 +19,18 @@
 				console.debug("WSDOM WebSocket connection open!");
 				console.debug("WebSocket object", ws);
 				console.debug("WSDOM object", wsdom);
+				setConnectingLabel("Connected to WSDOM server.");
 			};
 			ws.onmessage = (msg) => {
 				wsdom.handleIncomingMessage(msg.data);
 			};
 			ws.onclose = (ev) => {
 				console.debug("WSDOM WebSocket closed", ev);
+				setConnectingLabel("Disconnected from WSDOM server. Try refreshing the page.");
 			};
 			ws.onerror = (ev) => {
 				console.warn("WSDOM WebSocket errored", ev);
+				setConnectingLabel("WebSocket error. Try refreshing the page.");
 			};
 		}
 		class WSDOM {
@@ -54,12 +61,19 @@
 				this.values = new Map();
 			}
 		}
-		WSDOMConnectWebSocket("ws://localhost:3000/ws");
+		WSDOMConnectWebSocket("ws://localhost:4000/ws");
 	</script>
+	<style>
+		#connecting-label {
+			position: fixed;
+			bottom: 0;
+			right: 0;
+		}
+	</style>
 </head>
 
 <body>
-
+	<span id="connecting-label">Connecting...</span>
 </body>
 
 </html>

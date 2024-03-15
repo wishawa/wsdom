@@ -3,10 +3,10 @@ use wsdom::Browser;
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/ws", get(handler));
+    let router = Router::new().route("/ws", get(handler));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:4000").await.unwrap();
+    axum::serve(listener, router).await.unwrap();
 }
 
 async fn handler(ws: WebSocketUpgrade) -> Response {

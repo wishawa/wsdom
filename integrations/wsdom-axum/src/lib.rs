@@ -3,7 +3,13 @@ use std::{
     task::{Context, Poll},
 };
 
-use axum::extract::ws::{Message, WebSocket};
+use axum::{
+    extract::{
+        ws::{Message, WebSocket},
+        WebSocketUpgrade,
+    },
+    response::Response,
+};
 use futures_util::{Future, Sink, Stream, StreamExt};
 use pin_project_lite::pin_project;
 use wsdom_core::Browser;
@@ -100,5 +106,28 @@ where
         ws,
         browser,
         output: None,
+    }
+}
+
+pub fn browser_handler<Func, Fut>(
+    f: Func,
+) -> impl Fn(WebSocketUpgrade) -> std::future::Ready<Response> + Clone + Send + 'static
+where
+    Func: Clone + Send + 'static + Fn(Browser) -> Fut,
+    Fut: Future + Send + 'static,
+    Fut::Output: Send + 'static,
+{
+    move |upgrade: WebSocketUpgrade| {
+        let browser = Browser::new();
+        let fut = f(browser.clone());
+        std::future::ready(upgrade.on_upgrade(|ws| async move {
+            ToBrowserFuture {
+                fut,
+                ws,
+                browser,
+                output: None,
+            }
+            .await;
+        }))
     }
 }
