@@ -3,6 +3,9 @@ The "LiveView" design has been gaining popularity
 But why limit ourselves to *View*? Why not Live*Everything*?
 
 # WSDOM
+[<img alt="crates.io" src="https://img.shields.io/crates/v/wsdom?style=for-the-badge" height="20">](https://crates.io/crates/wsdom)
+[<img alt="crates.io" src="https://img.shields.io/docsrs/wsdom?style=for-the-badge" height="20">](https://docs.rs/wsdom)
+
 WSDOM is a no-roundtrip Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
 It lets Rust code hold JavaScript objects and call methods/functions over the network.
 

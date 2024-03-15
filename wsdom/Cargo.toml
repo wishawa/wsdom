@@ -7,6 +7,7 @@ license = "MPL-2.0"
 keywords = ["rpc", "remote", "javascript"]
 categories = ["api-bindings"]
 repository = "https://github.com/wishawa/wsdom"
+documentation = "https://docs.rs/wsdom"
 readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

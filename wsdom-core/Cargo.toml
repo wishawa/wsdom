@@ -3,6 +3,7 @@ name = "wsdom-core"
 version = "0.0.1"
 edition = "2021"
 license = "MPL-2.0"
+repository = "https://github.com/wishawa/wsdom"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
