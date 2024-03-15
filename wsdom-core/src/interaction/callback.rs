@@ -16,7 +16,7 @@ async fn example(browser: &Browser, button: wsdom::dom::HTMLButtonElement) {
     button.add_event_listener(&"click", &func, &wsdom::undefined());
 
     use futures_util::StreamExt;
-    let _click_event: wsdom::dom::MouseEvent = stream.next().await;
+    let _click_event: Option<wsdom::dom::MouseEvent> = stream.next().await;
     println!("the button was clicked!");
 }
 ```

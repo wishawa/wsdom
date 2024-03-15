@@ -5,9 +5,9 @@ mod counter;
 
 use std::future::Future;
 
-use axum::{response::Html, routing::get, Router};
+use axum::{extract::WebSocketUpgrade, response::Html, routing::get, Router};
 use wsdom::Browser;
-use wsdom_axum::browser_handler;
+use wsdom_axum::socket_to_browser;
 
 #[tokio::main]
 async fn main() {
@@ -32,7 +32,14 @@ where
 {
     let router = Router::new()
         .route("/", get(make_html(&*format!("{name}/ws"))))
-        .route("/ws", get(browser_handler(func)));
+        .route(
+            "/ws",
+            get(|wsu: WebSocketUpgrade| async move {
+                wsu.on_upgrade(|ws| async move {
+                    socket_to_browser(ws, func).await;
+                })
+            }),
+        );
     router
 }
 

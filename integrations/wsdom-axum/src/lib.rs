@@ -1,20 +1,19 @@
+//! Integration code for conveniently using WSDOM with the Axum web framework.
+//!
+//! This library provides only one function: [socket_to_browser].
+
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
 
-use axum::{
-    extract::{
-        ws::{Message, WebSocket},
-        WebSocketUpgrade,
-    },
-    response::Response,
-};
+use axum::extract::ws::{Message, WebSocket};
 use futures_util::{Future, Sink, Stream, StreamExt};
 use pin_project_lite::pin_project;
 use wsdom_core::Browser;
 
 pin_project! {
+    /// Future type returned from [socket_to_browser].
     pub struct ToBrowserFuture<Fut: Future> {
         #[pin] ws: WebSocket,
         #[pin] fut: Fut,
@@ -88,13 +87,40 @@ where
     }
 }
 
+/// Output type of [ToBrowserFuture].
 pub enum Output<T> {
+    /// The inner function (the second argument passed to `socket_to_browser`) completed with this result.
     Done(T),
+    /// The WebSocket connection was closed, for whatever reason.
     ConnectionClosed,
+    /// Axum raised an error.
     AxumError(axum::Error),
+    /// WSDOM raised an error.
     WsdomError(wsdom_core::Error),
 }
 
+/// Get a [Browser] from an [axum::WebSocket] object.
+///
+/// You should first follow [axum's tutorial on how to obtain the WebSocket](https://docs.rs/axum/latest/axum/extract/ws/index.html).
+/// Once you have the WebSocket object,
+/// pass it to `socket_to_browser` along with an async function/closure that takes a Browser as argument,
+/// then await the returned Future.
+///
+/// ```rust
+/// # use wsdom_core::Browser;
+/// use wsdom_axum::socket_to_browser;
+/// use axum::extract::{WebSocketUpgrade, ws::WebSocket};
+/// use axum::response::Response;
+/// async fn axum_handler(wsu: WebSocketUpgrade) -> Response {
+///     wsu.on_upgrade(|ws: WebSocket| async move {
+///         socket_to_browser(ws, app).await;
+///     })
+/// }
+/// async fn app(browser: Browser) {
+///     // do things...
+/// }
+/// ````
+#[must_use = "the return type is a Future and should be .awaited"]
 pub fn socket_to_browser<Func, Fut>(ws: WebSocket, f: Func) -> ToBrowserFuture<Fut>
 where
     Func: FnOnce(Browser) -> Fut,
@@ -106,28 +132,5 @@ where
         ws,
         browser,
         output: None,
-    }
-}
-
-pub fn browser_handler<Func, Fut>(
-    f: Func,
-) -> impl Fn(WebSocketUpgrade) -> std::future::Ready<Response> + Clone + Send + 'static
-where
-    Func: Clone + Send + 'static + Fn(Browser) -> Fut,
-    Fut: Future + Send + 'static,
-    Fut::Output: Send + 'static,
-{
-    move |upgrade: WebSocketUpgrade| {
-        let browser = Browser::new();
-        let fut = f(browser.clone());
-        std::future::ready(upgrade.on_upgrade(|ws| async move {
-            ToBrowserFuture {
-                fut,
-                ws,
-                browser,
-                output: None,
-            }
-            .await;
-        }))
     }
 }

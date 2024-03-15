@@ -6,6 +6,8 @@ It lets Rust code hold and manipulate JavaScript objects over the network.
 
 For an overview of what this library does, see the [README on GitHub](https://github.com/wishawa/wsdom).
 
+Small code examples to help you get started are available [on GitHub](https://github.com/wishawa/wsdom/tree/main/examples).
+
 # Documentation
 `wsdom::dom` is the module you will be working with most of the time.
 This module contains stubs for the Web API (`HTMLElement`, `Canvas`, etc.).

@@ -1,6 +1,10 @@
+The "LiveView" design has been gaining popularity
+(we have [Phoenix LiveView](https://github.com/phoenixframework/phoenix_live_view), [LiveViewJS](https://www.liveviewjs.com/), [Dioxus LiveView](https://dioxuslabs.com/learn/0.5/reference/liveview)).
+But why limit ourselves to *View*? Why not Live*Everything*?
+
 # WSDOM
-WSDOM is a roundtrip-free Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
-It lets Rust code hold and manipulate JavaScript objects over the network.
+WSDOM is a no-roundtrip Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
+It lets Rust code hold JavaScript objects and call methods/functions over the network.
 
 WSDOM can be used to add network-dependent functionalities to webpages without writing JS code or making API endpoints. It can also be integrated into "LiveView"-style Rust web frameworks to expose access to the full Web API.
 
@@ -21,7 +25,7 @@ fn hello(browser: wsdom::Browser) {
 WSDOMConnectWebSocket("ws://my-website.domain:4000/");
 ```
 
-Our full "Hello World!" code is available [here](/examples/hello/).
+Our full "Hello World!" code is available [here](/examples/hello/src/main.rs).
 
 ## Key Features (and Anti-Features)
 -   WSDOM generates **strongly-typed** Rust stubs for JS classes/functions/methods based on `.d.ts` TypeScript definitions.
@@ -55,9 +59,16 @@ Our full "Hello World!" code is available [here](/examples/hello/).
             println!("button was clicked on the browser!");
         }
         ```
--   WSDOM itself is **transport-agnostic**, **framework-agnostic**, and **executor-agnostic**,
-    but I provide an integration library for easily getting started with WSDOM on
+-   WSDOM is **transport-agnostic**, **framework-agnostic**, and **executor-agnostic**.
+    That said, we provide an integration library for easily getting started with WSDOM on
     [Axum web framework](https://github.com/tokio-rs/axum/) (which uses the Tokio executor) with WebSocket.
+
+## Examples
+Hosted examples are available.
+When viewing them, I recommend opening your browser's network devtool to see the WebSocket traffic.
+- Counter example: [code](/examples/many-examples/src/counter.rs) [demo](http://141.145.215.129:4000/counter)
+- Audio API example: [code](/examples/many-examples/src/audio.rs) [demo](http://141.145.215.129:4000/audio)
+- Canvas API example: [code](/examples/many-examples/src/canvas.rs) [demo](http://141.145.215.129:4000/canvas)
 
 ## Comparisons
 ### [web-sys](https://docs.rs/web-sys/latest/web_sys/)
