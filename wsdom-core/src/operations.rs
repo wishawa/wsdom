@@ -182,11 +182,13 @@ impl JsValue {
     /// Retrive this value from the JS side to the Rust side.
     /// Returns Future whose output is a [serde_json::Value].
     ///
-    /// # use wsdom::dom::Browser
+    /// ```rust
+    /// # use wsdom::Browser;
     /// # use wsdom::dom::HTMLInputElement;
     /// async fn example(input: &HTMLInputElement) {
     ///     let _val = input.get_value().retrieve_json().await;
     /// }
+    /// ```
     pub fn retrieve_json(&self) -> RetrieveFuture<'_, serde_json::Value> {
         self.retrieve_and_deserialize()
     }

@@ -5,7 +5,7 @@
 [<img alt="crates.io" src="https://img.shields.io/crates/v/wsdom?style=for-the-badge" height="20">](https://crates.io/crates/wsdom)
 [<img alt="crates.io" src="https://img.shields.io/docsrs/wsdom?style=for-the-badge" height="20">](https://docs.rs/wsdom)
 
-WSDOM is a no-roundtrip Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
+WSDOM is a Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
 It lets Rust code hold JavaScript objects and call methods/functions over the network.
 
 WSDOM can be used to add network-dependent functionalities to webpages without writing JS code or making API endpoints. It can also be integrated into "LiveView"-style Rust web frameworks to expose access to the full Web API.
