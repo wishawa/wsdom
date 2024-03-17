@@ -5,6 +5,8 @@
 [<img alt="crates.io" src="https://img.shields.io/crates/v/wsdom?style=for-the-badge" height="20">](https://crates.io/crates/wsdom)
 [<img alt="crates.io" src="https://img.shields.io/docsrs/wsdom?style=for-the-badge" height="20">](https://docs.rs/wsdom)
 
+![wsdom-counter-video](https://github.com/wishawa/wsdom/assets/49518157/7ba9f79c-f2ec-42ad-9be3-90ef977988d3)
+
 WSDOM is a Rust → JavaScript *Remote Method Invocation* or *Distributed Objects* system.
 It lets Rust code hold JavaScript objects and call methods/functions over the network.
 
