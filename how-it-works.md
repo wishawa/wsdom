@@ -1,7 +1,7 @@
 # How WSDOM Works
 ## Code Serialization
 When you use WSDOM to call a JS function, WSDOM generates the equivalent JavaScript code and sends it over WebSocket.
-The WSDOM client on the JS side receives the code and feeds it into [Function()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/Function) (`eval`'s little sibling) to execute it.
+The WSDOM client on the JS side ([code here](/js/servant.ts)) receives the code and feeds it into [Function()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/Function) (`eval`'s little sibling) to execute it.
 
 For example, if you run this Rust code
 ```rust
