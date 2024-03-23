@@ -59,7 +59,7 @@ Our full "Hello World!" code is available [here](/examples/hello/src/main.rs).
         async fn example(browser: Browser, button: &HTMLElement) {
             let (stream, callback) = wsdom::callback::new_callback::<MouseEvent>(&browser);
             button.add_event_listener(&"click", &callback, &wsdom::undefined());
-            let _click_event: MouseEvent = stream.next().await; // wait for the Stream to yield
+            let _click_event: Option<MouseEvent> = stream.next().await; // wait for the Stream to yield
             println!("button was clicked on the browser!");
         }
         ```
