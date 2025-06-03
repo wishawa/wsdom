@@ -66,11 +66,6 @@ impl<'a> UseInJsCode for RawCodeImmediate<'a> {
 ///
 /// For example, `ToJs<JsNumber>` means serializable to the same type that
 /// `JsNumber` serializes to.
-pub trait ToJs<JsType>
-where
-    Self: UseInJsCode,
-    JsType: ?Sized,
-{
-}
+pub trait ToJs<JsType>: UseInJsCode {}
 
-impl<T: ?Sized> ToJs<T> for T where T: UseInJsCode {}
+impl<T> ToJs<T> for T where T: UseInJsCode {}
